@@ -1,7 +1,10 @@
 var fs=require("fs")
 
+console.log("opening file..")
+
 // var file=fs.readFileSync("test.html").toString()
 var file=fs.readFileSync("messages.htm").toString()
+
 
 var threads=file.split('<div class="thread">')
 
@@ -9,6 +12,7 @@ var main=[];
 /*
  * 0: {
  *      participants=["blah", "blah2"],
+ *      first_message=1406714685263,
  *      messages=[
  *        0: {
  *            author:"blah2"
@@ -29,6 +33,10 @@ function add_thread(participants)
 	for(var i in main)
 	{
 		var found=true;
+		
+		if(main[i].participants.length!=participants.length)
+			continue;
+			
 		for(var j in participants)
 		{
 			if(main[i].participants.indexOf(participants[j])==-1) //if any of participants weren't found
@@ -48,6 +56,7 @@ function add_thread(participants)
 	var tmpobj={}
 	tmpobj.participants=participants;
 	tmpobj.messages=[];
+	tmpobj.first_message=140671468526300;
 	
 // 	console.log("adding new thread")
 	
@@ -56,6 +65,8 @@ function add_thread(participants)
 
 var count=0;
  
+console.info("parsing..")
+
 for(var i in threads)
 {
 	var cthread=threads[i].toString();
@@ -124,6 +135,11 @@ for(var i in threads)
 			break;
 		}
 		
+		if(main[thread_id].first_message>tmpm.time)
+		{
+			main[thread_id].first_message=tmpm.time;
+		}
+		
 		p=body_begin;
 		k=cm.indexOf('</p>', p);
 		
@@ -134,5 +150,13 @@ for(var i in threads)
 		main[thread_id].messages.push(tmpm);
   }
 }
-fs.writeFile("parsed.json", JSON.stringify(main))
-console.log("typed "+count+" chars")
+
+console.info("converting to JSON..")
+
+main=JSON.stringify(main)
+
+console.info("saving..")
+
+fs.writeFile("parsed.json", main) //so slow
+
+// console.log("typed "+count+" chars")
