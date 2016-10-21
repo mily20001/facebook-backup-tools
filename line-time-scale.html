@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+
+<head>
+	<title>Line Chart</title>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.1.3/Chart.bundle.js"></script>
+	<style>
+    canvas {
+        -moz-user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+    }
+	</style>
+	<style>#canvas { background-color: rgba(0, 0, 0, 0.9); }</style> <!--so dark-->
+	<meta charset="UTF-8">
+</head>
+
+<body bgcolor=#000000 > <!--darkness-->
+<input id="id_time" list="people_list" autofocus maxlength="10000"><button onclick="weekly()">Check</button>
+<datalist id="people_list">
+##people_list##
+</datalist>
+	<div style="width:95%;">
+		<canvas id="canvas"></canvas>
+	</div>
+
+	
+	<script>
+	Chart.defaults.global.defaultFontColor="#999"
+	Chart.defaults.scale.gridLines.color="rgba(250, 250, 250, 0.15)"
+		var timeFormat = 'MM/DD/YYYY HH:mm';
+
+		function newDate(days) {
+			return moment().add(days, 'd').toDate();
+		}
+
+		var config = {
+			type: 'line',
+			data: {
+				labels: ##dates##, // Date Objects
+				datasets: [
+				{
+					label: "Odebrane", //received messages
+					borderColor: "rgba(255, 0, 0, 0.7)",
+					backgroundColor: "rgba(180, 0, 0, 0)",
+					pointBorderColor: "rgba(255, 200, 180, 0.6)",
+					pointBackgroundColor: "rgba(255, 200, 180, 0.6)",
+					pointBorderWidth: 1,
+					data: ##dataR##
+				},
+				{
+					label: "Wysłane", //sent messages
+					borderColor: "rgba(0, 255, 0, 0.7)",
+					backgroundColor: "rgba(190, 255, 70, 0)",
+					pointBorderColor: "rgba(150, 255, 200, 0.6)",
+					pointBackgroundColor: "rgba(150, 255, 200, 0.6)",
+					pointBorderWidth: 1,
+					data: ##dataS##
+				},
+				{
+					label: "Łącznie", //sent+received
+					borderColor: "rgba(0, 0, 255, 1)",
+					backgroundColor: "rgba(0, 0, 175, 0.4)",
+					pointBorderColor: "rgba(150, 220, 255, 1)",
+					pointBackgroundColor: "rgba(150, 220, 255, 1)",
+					pointBorderWidth: 1,
+					data: ##data##
+				}]
+			},
+			options: {
+				responsive: true,
+                title:{
+                    display:true,
+                    text:"Liczba wiadomości w dwutygodniowym okresie"
+                },
+				scales: {
+					xAxes: [{
+					
+						type: "time",
+						time: {
+							format: timeFormat,
+							tooltipFormat: 'll'
+						},
+						scaleLabel: {
+							display: true,
+							labelString: 'Data'
+						}
+					}, ],
+					yAxes: [{
+						scaleLabel: {
+							display: true,
+							labelString: 'Liczba wiadomości' //amount of messages
+						}
+					}]
+				},
+			}
+		};
+
+		window.onload = function() {
+			var ctx = document.getElementById("canvas").getContext("2d");
+			window.myLine = new Chart(ctx, config);
+
+		};
+		
+		
+		function weekly()
+		{
+			window.location.href="http://localhost:8097/"+encodeURI(document.getElementById('id_time').value)
+		}
+
+	</script>
+</body>
+
+</html>

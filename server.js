@@ -1,9 +1,35 @@
 var fs=require("fs")
 var http=require("http")
 
+var you=""
+
+if(you.length<2)
+	throw "Enter your name in 4th line!"
+
 var threads=JSON.parse(fs.readFileSync("parsed.json"))
 
 console.log("Loaded "+threads.length+" threads.")
+
+
+//generating list of conversations
+
+var people="";
+for(var i in threads)
+{
+	var tmp=threads[i].participants;
+	
+	if(threads[i].participants.length==2) //removing yourself from participants. It also add only two-person conversations, because other amount of people is not supported for now :(
+	{
+		tmp=tmp.filter(item => item !== you);
+	}
+	else
+		continue;
+// 		tmp=you;
+	
+		people+='<option value="'+tmp+'">\n'
+}
+
+
 
 function find_thread(participants)
 {
@@ -28,61 +54,190 @@ function find_thread(participants)
 			return i;
 		}
 	}
+	console.error("THREAD NOT FOUND ("+participants+")")
 	return -1;
 }
 
-function month_stats(thread_id)
+function move_date_back(date, days) //moving date back for <days> days
 {
-	var stats=[];
-	var time=new Date(threads[thread_id].first_message);
-	time.setUTCDate(1);
+	var tmp=new Date(0);
+	tmp.setUTCDate(days+1);
+	return new Date(date-tmp);
+}
+
+function weekly_stats(thread_id) 
+{
+	console.log("generating weekly stats")
+	var stats=[]; //sum of sent and recived messages/chars/words per two weeks
+	var statsS=[]; //sent messages/chars/words per two weeks
+	
+	var time=new Date(threads[thread_id].first_message); //set time to 0:00:00.000 for easier comparison
 	time.setUTCHours(0);
 	time.setUTCMinutes(0);
 	time.setUTCSeconds(0);
 	time.setUTCMilliseconds(0);
 	
-	var tmonth=time.getUTCMonth();
-	var tyear =time.getUTCFullYear();
+	time=move_date_back(time, time.getUTCDay()); //move back to first day of the week
+	
+	var twoweeks=new Date(0);
+	twoweeks.setUTCDate(1+14);
+
+	var tdays=time.getUTCDate();
 	var now=new Date();
 	
-	while(time<=now)
+	while(time<=now) //generate and 0fill arrays
 	{
-		time.setUTCMonth(tmonth++);
-		time.setUTCFullYear(tyear);
-		if(tmonth==12)
-		{
-			tmonth=0;
-			tyear++;
-		}
-// 		console.log(time)
-		
 		stats[time]=0;
+		statsS[time]=0;
+		time=new Date(time.valueOf()+twoweeks.valueOf()); //generate dates in distance of two weeks
+// 		console.log("after->"+time)
 	}
 	
-	for(var i in threads[thread_id].messages)
+	
+	for(var i in threads[thread_id].messages) //matching each message to apropirate date
 	{
-		var plain_date=new Date(0);
+		var plain_date=new Date(0); //it has time=0:00:00.000 (UTC)
 		var msg_date=new Date(threads[thread_id].messages[i].time);
+		plain_date.setUTCDate(msg_date.getUTCDate())  //setting date to the same as in message
 		plain_date.setUTCMonth(msg_date.getUTCMonth())
-		plain_date.setUTCFullYear(msg_date.getUTCFullYear())
-		stats[plain_date]++;
-// 		console.log(plain_date)
+		plain_date.setUTCFullYear(msg_date.getUTCFullYear()) 
+		plain_date=move_date_back(plain_date, plain_date.getUTCDay()) //moving it back to first day of the week
+		
+		if(!(stats.hasOwnProperty(plain_date))) //it may be between two dates in array (because i'm making two-week summary)
+		{
+			plain_date=move_date_back(plain_date, 7) //so i'm moving it back for one week
+		}
+		
+		if(threads[thread_id].messages[i].author==you) //checking it message was sent or received
+		{
+			statsS[plain_date]++ //threads[thread_id].messages[i].body.length; //incrementing amount of messages
+		}
+		stats[plain_date]++ //threads[thread_id].messages[i].body.length
 	}
-	console.log(stats);
+
+	/*generating html (problably only temporary)*/
 	
+	var tmphtml=fs.readFileSync("line-time-scale.html").toString(); //reading model html
+
+	var dates="[", data="[", dataS="[", dataR="[";
+
+	for(var i in stats) //generating strings filled with data
+	{
+		var tmpd=new Date(i);
+		dates+=tmpd.valueOf()+", ";
+		data+=stats[i]+", ";
+		dataS+=statsS[i]+", ";
+		dataR+=stats[i]-statsS[i]+", ";
+	}
+
+	dates=dates.slice(0, -2)+"]";
+	data=data.slice(0, -2)+"]";
+	dataS=dataS.slice(0, -2)+"]";
+	dataR=dataR.slice(0, -2)+"]";
+
+	tmphtml=tmphtml.replace("##dates##", dates); //replacing tags with corresponding
+	tmphtml=tmphtml.replace("##data##", data);
+	tmphtml=tmphtml.replace("##dataS##", dataS);
+	tmphtml=tmphtml.replace("##dataR##", dataR);
+	
+	tmphtml=tmphtml.replace("##people_list##", people);
+
+	console.log("done");
+	
+	return tmphtml;
 }
 
-month_stats(find_thread(["", ""]))
-
-
-// http.createServer(function(req, res)
+/*actually dropped*/
+// function month_stats(thread_id)
 // {
-// 	if(req.url=='/')
+// 	var stats=[];
+// 	var statsS=[];
+// 	var time=new Date(threads[thread_id].first_message);
+// 	time.setUTCDate(1);
+// 	time.setUTCHours(0);
+// 	time.setUTCMinutes(0);
+// 	time.setUTCSeconds(0);
+// 	time.setUTCMilliseconds(0);
+// 	
+// 	var tmonth=time.getUTCMonth();
+// 	var tyear =time.getUTCFullYear();
+// 	var now=new Date();
+// 	
+// 	while(time<=now)
 // 	{
-// 		res.end(fs.readFileSync("index.html"))
+// 		time.setUTCMonth(tmonth++);
+// 		time.setUTCFullYear(tyear);
+// 		if(tmonth==12)
+// 		{
+// 			tmonth=0;
+// 			tyear++;
+// 		}
+// // 		console.log(time)
+// 		
+// 		stats[time]=0;
+// 		statsS[time]=0;
 // 	}
-// 	else
+// 	
+// 	for(var i in threads[thread_id].messages)
 // 	{
-// 		res.end(0);
+// 		var plain_date=new Date(0);
+// 		var msg_date=new Date(threads[thread_id].messages[i].time);
+// 		plain_date.setUTCMonth(msg_date.getUTCMonth())
+// 		plain_date.setUTCFullYear(msg_date.getUTCFullYear())
+// 		stats[plain_date]++;
+// 		if(threads[thread_id].messages[i].author==you)
+// 		{
+// 			statsS[plain_date]++;
+// 		}
+// // 		console.log(plain_date)
 // 	}
-// }).listen(8097);
+// // 	console.log(stats);
+//
+//
+//
+// 	var tmphtml=fs.readFileSync("line-time-scale.html").toString();
+// 
+// 	var dates="[", data="[", dataS="[", dataR="[";
+// 
+// 	for(var i in stats)
+// 	{
+// 	// 	dates+='"'+i+'", ';
+// 		var tmpd=new Date(i);
+// 		dates+=tmpd.valueOf()+", ";
+// 		data+=stats[i]+", ";
+// 	}
+// 
+// 	dates=dates.slice(0, -2)+"]";
+// 	data=data.slice(0, -2)+"]";
+// 
+// // 	console.log(dates);
+// // 	console.log(data);
+// 
+// 	tmphtml=tmphtml.replace("##dates", dates);
+// 	tmphtml=tmphtml.replace("##data", data);
+// 
+// 	console.log("done")
+// 	
+// 	return tmphtml;
+// 	// 	return stats;
+// }
+
+// fs.writeFile("chart.html", tmphtml)
+
+
+
+
+
+http.createServer(function(req, res)
+{
+	console.log("req:"+decodeURI(req.url))
+	if(req.url=='/')
+	{
+		res.end(fs.readFileSync("index.html"))
+	}
+	else if(req.url!="/favicon.ico")
+	{
+		//its really lame, but for early tests works good, has no support of group conversations, and conversations with yourself :(
+		res.end(weekly_stats(find_thread([you, decodeURI(req.url).substring(1)]).toString()))
+	}
+}).listen(8097);
