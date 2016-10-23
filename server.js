@@ -147,6 +147,26 @@ function weekly_stats(thread_id)
 	return tmphtml;
 }
 
+var messages_conversation=[]
+
+function messages_per_conversation()
+{
+	for(var i in threads)
+	{
+		messages_conversation.push({
+														participants: threads[i].participants,
+														messages: parseInt(threads[i].messages.length)})
+	}
+	
+	messages_conversation.sort(function (x, y){
+		return parseInt(y.messages, 10)-parseInt(x.messages, 10)})
+	
+	for(var i in messages_conversation)
+	{
+		console.log(messages_conversation[i].messages)
+	}
+}
+
 /*actually dropped*/
 // function month_stats(thread_id)
 // {
@@ -225,7 +245,7 @@ function weekly_stats(thread_id)
 // fs.writeFile("chart.html", tmphtml)
 
 
-
+messages_per_conversation();
 
 
 http.createServer(function(req, res)
@@ -234,6 +254,10 @@ http.createServer(function(req, res)
 	if(req.url=='/')
 	{
 		res.end(fs.readFileSync("index.html"))
+	}
+	else if(req.url=="/messages_per_conversation")
+	{
+		res.end(JSON.stringify(messages_conversation));
 	}
 	else if(req.url!="/favicon.ico")
 	{
