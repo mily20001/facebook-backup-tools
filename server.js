@@ -5,6 +5,8 @@ var you=""
 
 if(you.length<2)
 	throw "Enter your name in 4th line!"
+	
+console.log("Loading parsed JSON...")
 
 var threads=JSON.parse(fs.readFileSync("parsed.json"))
 
@@ -151,20 +153,47 @@ var messages_conversation=[]
 
 function messages_per_conversation()
 {
+	console.log("generating global stats..")
 	for(var i in threads)
 	{
+		var sent_chars=0, sent_words=0, sent_messages=0;
+		var received_chars=0, received_words=0, received_messages=0;
+		for (var msg in threads[i].messages)
+		{
+			if(threads[i].messages[msg].author==you)
+			{
+				sent_chars+=threads[i].messages[msg].body.length;
+				sent_words+=threads[i].messages[msg].body.split(" ").length
+				sent_messages++;
+			}
+			else
+			{
+				received_chars+=threads[i].messages[msg].body.length;
+				received_words+=threads[i].messages[msg].body.split(" ").length
+				received_messages++;
+			}
+		}
 		messages_conversation.push({
 														participants: threads[i].participants,
-														messages: parseInt(threads[i].messages.length)})
+														messages: parseInt(threads[i].messages.length),
+														sent_chars: sent_chars,
+														sent_words: sent_words,
+														sent_messages: sent_messages,
+														received_chars: received_chars,
+														received_words: received_words,
+														received_messages: received_messages
+		})
 	}
 	
 	messages_conversation.sort(function (x, y){
 		return parseInt(y.messages, 10)-parseInt(x.messages, 10)})
 	
-	for(var i in messages_conversation)
-	{
-		console.log(messages_conversation[i].messages)
-	}
+// 	for(var i in messages_conversation)
+// 	{
+// 		console.log(messages_conversation[i].messages)
+// 	}
+	
+	console.log("done.")
 }
 
 /*actually dropped*/
@@ -247,6 +276,7 @@ function messages_per_conversation()
 
 messages_per_conversation();
 
+console.log("Server ready.")
 
 http.createServer(function(req, res)
 {
