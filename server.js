@@ -1,5 +1,6 @@
 var fs=require("fs")
 var http=require("http")
+var WebSocketServer=require('websocket').server;
 
 var you=""
 
@@ -20,15 +21,7 @@ for(var i in threads)
 {
 	var tmp=threads[i].participants;
 	
-	if(threads[i].participants.length==2) //removing yourself from participants. It also add only two-person conversations, because other amount of people is not supported for now :(
-	{
-		tmp=tmp.filter(item => item !== you);
-	}
-	else
-		continue;
-// 		tmp=you;
-	
-		people+='<option value="'+tmp+'">\n'
+		people+='<option value="'+tmp.join(", ")+'">\n'
 }
 
 
@@ -121,32 +114,36 @@ function weekly_stats(thread_id)
 	
 	var tmphtml=fs.readFileSync("line-time-scale.html").toString(); //reading model html
 
-	var dates="[", data="[", dataS="[", dataR="[";
+	var labels=[], dataB=[], dataS=[], dataR=[];
 
 	for(var i in stats) //generating strings filled with data
 	{
 		var tmpd=new Date(i);
-		dates+=tmpd.valueOf()+", ";
-		data+=stats[i]+", ";
-		dataS+=statsS[i]+", ";
-		dataR+=stats[i]-statsS[i]+", ";
+		labels.push(tmpd.valueOf());
+		dataB.push(stats[i]);
+		dataS.push(statsS[i]);
+		dataR.push(stats[i]-statsS[i]);
 	}
 
-	dates=dates.slice(0, -2)+"]";
-	data=data.slice(0, -2)+"]";
-	dataS=dataS.slice(0, -2)+"]";
-	dataR=dataR.slice(0, -2)+"]";
-
-	tmphtml=tmphtml.replace("##dates##", dates); //replacing tags with corresponding
-	tmphtml=tmphtml.replace("##data##", data);
-	tmphtml=tmphtml.replace("##dataS##", dataS);
-	tmphtml=tmphtml.replace("##dataR##", dataR);
-	
-	tmphtml=tmphtml.replace("##people_list##", people);
+// 	dates=dates.slice(0, -2)+"]";
+// 	data=data.slice(0, -2)+"]";
+// 	dataS=dataS.slice(0, -2)+"]";
+// 	dataR=dataR.slice(0, -2)+"]";
+// 
+// 	tmphtml=tmphtml.replace("##dates##", dates); //replacing tags with corresponding
+// 	tmphtml=tmphtml.replace("##data##", data);
+// 	tmphtml=tmphtml.replace("##dataS##", dataS);
+// 	tmphtml=tmphtml.replace("##dataR##", dataR);
+// 	
+// 	tmphtml=tmphtml.replace("##people_list##", people);
 
 	console.log("done");
 	
-	return tmphtml;
+	return {"labels": labels,
+					"dataB": dataB,
+					"dataS": dataS,
+					"dataR": dataR
+	};
 }
 
 var messages_conversation=[]
@@ -278,7 +275,7 @@ messages_per_conversation();
 
 console.log("Server ready.")
 
-http.createServer(function(req, res)
+var server=http.createServer(function(req, res)
 {
 	console.log("req:"+decodeURI(req.url))
 	if(req.url=='/')
@@ -291,7 +288,74 @@ http.createServer(function(req, res)
 	}
 	else if(req.url!="/favicon.ico")
 	{
+		res.end(0);
 		//its really lame, but for early tests works good, has no support of group conversations, and conversations with yourself :(
-		res.end(weekly_stats(find_thread([you, decodeURI(req.url).substring(1)]).toString()))
+// 		res.end(weekly_stats(find_thread([you, decodeURI(req.url).substring(1)]).toString())) //dropped (yay)
 	}
 }).listen(8097);
+
+
+wsServer = new WebSocketServer({
+	httpServer: server
+});
+
+var ws_clients=[];
+var ws_clients_count=0;
+
+wsServer.on('request', function(r)
+{
+	var connection = r.accept('fb_stats', r.origin);
+	var id = ws_clients_count++;
+	
+	ws_clients[id] = connection
+	
+	connection.on('message', function(message)
+	{
+		console.log("Recived message: "+message.utf8Data);
+		var data=JSON.parse(message.utf8Data);
+		
+		if(!data.hasOwnProperty("type"))
+		{
+			console.log("invalid message.")
+			return;
+		}
+		
+		if(data.type=="weekly_stats")
+		{
+			var thread_id=find_thread(data.participants)
+			if(thread_id==-1)
+			{
+				console.log("thread "+data.participants+" not found")
+				ws_clients[id].sendUTF(JSON.stringify({"error": "requested thread not found"}))
+				return;
+			}
+			
+			var wyn=weekly_stats(thread_id)
+			
+			wyn={"type": "weekly_stats",
+					"dataR": wyn.dataR,
+					"dataS": wyn.dataS,
+					"dataB": wyn.dataB,
+					"labels": wyn.labels
+					}
+			
+			ws_clients[id].sendUTF(JSON.stringify(wyn))
+		}
+		else if(data.type=="people")
+		{
+			ws_clients[id].sendUTF(JSON.stringify({"type": "people", "list":people}))
+		}
+		else
+		{
+			console.log(data.type+" unsupported :(")
+		}
+	});
+
+	connection.on('close', function(reasonCode, description)
+	{
+		delete ws_clients[id];
+		console.log((new Date())+' Peer '+connection.remoteAddress+' disconnected.');
+	});
+	
+	 console.log((new Date())+' Connection accepted ['+id+']');
+});
