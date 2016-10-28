@@ -53,12 +53,13 @@
   <input id="participants" list="people_list" autofocus>
   <datalist id="people_list"></datalist>
 	<button onclick="generate_chart()">Generate chart</button>
-<!-- 	<iframe height="900" width="1000" id="iframe" sandbox="allow-same-origin allow-scripts"></iframe> -->
+	<button onclick="generate_hour_chart()">Generate hour stats (global only)</button>
 
 	<div style="width:98%;">
 		<canvas id="canvas"></canvas>
 	</div>
 	
+	<!--To be removed-->
 	Odebrane:<input type="checkbox" id="display_received" checked onclick="display_received()">
 	Wysłane:<input type="checkbox" id="display_sent" checked onclick="display_sent()">
 	
@@ -81,15 +82,37 @@
 		{
 			received_cfg.data=msg.dataR;
 			sent_cfg.data=msg.dataS;
-			chart_config.data.datasets[0].data=msg.dataR
-			chart_config.data.datasets[1].data=msg.dataS
-			chart_config.data.datasets[2].data=msg.dataB; /*FIXME hardcoded :( */
-			chart_config.data.labels=msg.labels
-			window.myLine.update();
+			time_line_chart_config.data.datasets[0].data=msg.dataR
+			time_line_chart_config.data.datasets[1].data=msg.dataS
+			time_line_chart_config.data.datasets[2].data=msg.dataB; /*FIXME hardcoded :( */
+			time_line_chart_config.data.labels=msg.labels
+			
+			if(window.myLine.chart.config.type=="line") /*if other type, then regenerate chart*/
+				window.myLine.update();
+			else
+			{
+				window.myLine.destroy();
+				var ctx=document.getElementById("canvas").getContext("2d");
+				window.myLine=new Chart(ctx, time_line_chart_config);
+			}
 		}
 		else if(msg.type=="people")
 		{
 			document.getElementById("people_list").innerHTML=msg.list
+		}
+		else if(msg.type=="hour_stats")
+		{
+			bar_chart_config.data.labels=msg.labels;
+			bar_chart_config.data.datasets[0].data=msg.data
+			
+			if(window.myLine.chart.config.type=="bar") /*if other type, then regenerate chart*/
+				window.myLine.update(); 
+			else
+			{
+				window.myLine.destroy();
+				var ctx=document.getElementById("canvas").getContext("2d");
+				window.myLine=new Chart(ctx, bar_chart_config);
+			}
 		}
 	});
 	
@@ -115,9 +138,12 @@
 		send(JSON.stringify(message));
 	}
 	
-	send(JSON.stringify({"type": "people"}))
+	function generate_hour_chart()
+	{
+		send(JSON.stringify({type: "hour_stats"}))
+	}
 	
-// 	setTimeout(send, 0, JSON.stringify({"type": "people"}))
+	send(JSON.stringify({"type": "people"}))
 	
 	</script>
 	
@@ -126,7 +152,7 @@
 	Chart.defaults.global.defaultFontColor="#999"
 	Chart.defaults.scale.gridLines.color="rgba(250, 250, 250, 0.15)"
 	var timeFormat = 'MM/DD/YYYY HH:mm';
-
+	
 	var received_cfg={
 				borderColor: "rgba(255, 0, 0, 0.6)",
 				backgroundColor: "rgba(180, 0, 0, 0)",
@@ -143,12 +169,7 @@
 				data: []
 	}
 	
-	
-	function newDate(days) {
-		return moment().add(days, 'd').toDate();
-	}
-
-	var chart_config = {
+	var time_line_chart_config={
 		type: 'line',
 		data: {
 			labels: [0, Date.now()], // Date Objects
@@ -208,11 +229,43 @@
 				}]
 			},
 		}
-	};
-
+	}
+	
+	
+	var bar_chart_config={
+		type: 'bar',
+		data: {
+			labels: [0, Date.now()], // Date Objects
+			datasets: [{
+				label: "Łącznie", //sent+received
+				backgroundColor: "rgba(0, 0, 175, 0.4)",
+				borderColor: "rgb(0, 0, 255)",
+				data: []
+			}]
+		},
+		options: {
+				elements: {
+					rectangle: {
+						borderWidth: 2,
+						borderColor: "rgb(0, 0, 255)",
+						borderSkipped: 'bottom'
+					}
+				},
+				responsive: true,
+				legend: {
+					position: 'top',
+				},
+				title: {
+					display: true,
+					text: 'Hour Stats'
+				}
+			}
+	}
+	
+	
 	window.onload = function() {
 		var ctx = document.getElementById("canvas").getContext("2d");
-		window.myLine = new Chart(ctx, chart_config);
+		window.myLine = new Chart(ctx, time_line_chart_config);
 
 	};
 	

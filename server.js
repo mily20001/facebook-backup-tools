@@ -125,18 +125,6 @@ function weekly_stats(thread_id)
 		dataR.push(stats[i]-statsS[i]);
 	}
 
-// 	dates=dates.slice(0, -2)+"]";
-// 	data=data.slice(0, -2)+"]";
-// 	dataS=dataS.slice(0, -2)+"]";
-// 	dataR=dataR.slice(0, -2)+"]";
-// 
-// 	tmphtml=tmphtml.replace("##dates##", dates); //replacing tags with corresponding
-// 	tmphtml=tmphtml.replace("##data##", data);
-// 	tmphtml=tmphtml.replace("##dataS##", dataS);
-// 	tmphtml=tmphtml.replace("##dataR##", dataR);
-// 	
-// 	tmphtml=tmphtml.replace("##people_list##", people);
-
 	console.log("done");
 	
 	return {"labels": labels,
@@ -144,6 +132,40 @@ function weekly_stats(thread_id)
 					"dataS": dataS,
 					"dataR": dataR
 	};
+}
+
+
+function hour_stats()
+{
+	console.log("Generating hour stats..")
+	var messages_hour={}
+	for(var i=0; i<24; i++)
+	{
+		messages_hour[i]=0;
+	}
+	
+	for(var thread_id in threads)
+	{
+		for(var msg in threads[thread_id].messages)
+		{
+			var msg_date=new Date(threads[thread_id].messages[msg].time);
+			messages_hour[msg_date.getHours()]++;
+		}
+	}
+	
+	var data=[], labels=[]
+	for(var i in messages_hour)
+	{
+		data.push(messages_hour[i])
+		labels.push(i+":00")
+	}
+	
+// 	console.log(messages_hour)
+	
+	console.log("done.")
+	
+	return {"data": data, "labels": labels}
+	
 }
 
 var messages_conversation=[]
@@ -273,6 +295,8 @@ function messages_per_conversation()
 
 messages_per_conversation();
 
+hour_stats();
+
 console.log("Server ready.")
 
 var server=http.createServer(function(req, res)
@@ -340,6 +364,15 @@ wsServer.on('request', function(r)
 					}
 			
 			ws_clients[id].sendUTF(JSON.stringify(wyn))
+		}
+		else if(data.type=="hour_stats")
+		{
+			var wyn=hour_stats()
+			wyn={"type": "hour_stats",
+					"data": wyn.data,
+					"labels": wyn.labels
+					}
+				ws_clients[id].sendUTF(JSON.stringify(wyn))
 		}
 		else if(data.type=="people")
 		{
