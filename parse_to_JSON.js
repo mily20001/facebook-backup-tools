@@ -1,4 +1,5 @@
 var fs=require("fs")
+var ProgressBar = require('progress');
 
 console.log("opening file..")
 
@@ -64,11 +65,13 @@ function add_thread(participants)
 }
 
 var count=0;
- 
-console.info("parsing..")
+
+var pbar = new ProgressBar('parsing [:bar] :percent :elapseds', { total: threads.length, current: 0, width: 30, incomplete: " " });
 
 for(var i in threads)
 {
+	pbar.tick();
+	
 	var cthread=threads[i].toString();
 	
   if(cthread.indexOf("<html>")>-1) //skipping header and stuff

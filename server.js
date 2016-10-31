@@ -1,6 +1,7 @@
 var fs=require("fs")
 var http=require("http")
 var WebSocketServer=require('websocket').server;
+var ProgressBar = require('progress');
 
 var you=""
 
@@ -25,13 +26,11 @@ for(var i in threads)
 }
 
 
-
 function find_thread(participants)
 {
 	for(var i in threads)
 	{
 		var found=true;
-		
 		if(threads[i].participants.length!=participants.length)
 			continue;
 		
@@ -60,71 +59,90 @@ function move_date_back(date, days) //moving date back for <days> days
 	return new Date(date-tmp);
 }
 
-function weekly_stats(thread_id) 
+function binSearch(arr, val) //it returns index of matching element, or first (closest) lower element
 {
-	console.log("generating weekly stats")
-	var stats=[]; //sum of sent and recived messages/chars/words per two weeks
-	var statsS=[]; //sent messages/chars/words per two weeks
+	var pos=Math.floor((arr.length+1)/2), dif=Math.floor((pos+1)/2);
+
+	while(true)
+	{
+		if(arr[pos]<val) pos+=dif;
+		else if(arr[pos]>val) pos-=dif
+		else return pos;
+		
+		if(dif<2) break;
+		
+		dif=Math.floor((dif+1)/2);
+	}
+
+	while(pos>0 && pos<arr.length-1)
+	{
+		if(arr[pos]<=val && arr[pos+1]>val)
+			break;
+		else if(arr[pos]<=val && arr[pos+1]<=val)
+			pos++;
+		else
+			pos--;
+	}
+
+	return pos;
+};
+
+function match_date(labels, date) /*welp*/
+{
+	return binSearch(labels, date)
+}
+
+function conversation_stats(thread_id, interval) 
+{
+	interval=parseInt(interval)
+	console.log("Generating conversation stats (interval="+interval+")")
+	var pbar = new ProgressBar('[:bar] :percent :etas', { total: threads[thread_id].messages.length, current: 0, width: 30, clear:true });
+	var stats={}; //sum of sent and recived messages/chars/words per interval
+	var statsS={}; //sent messages/chars/words per interval
+	var labels=[];
 	
-	var time=new Date(threads[thread_id].first_message); //set time to 0:00:00.000 for easier comparison
+	var time=new Date(threads[thread_id].first_message); //set initial hour to 0:00:00.000
 	time.setUTCHours(0);
 	time.setUTCMinutes(0);
 	time.setUTCSeconds(0);
 	time.setUTCMilliseconds(0);
 	
-	time=move_date_back(time, time.getUTCDay()); //move back to first day of the week
-	
-	var twoweeks=new Date(0);
-	twoweeks.setUTCDate(1+14);
-
-	var tdays=time.getUTCDate();
 	var now=new Date();
+	
+	var itime=new Date(0) /*interval time*/
+	itime.setUTCDate(1+interval);
 	
 	while(time<=now) //generate and 0fill arrays
 	{
-		stats[time]=0;
-		statsS[time]=0;
-		time=new Date(time.valueOf()+twoweeks.valueOf()); //generate dates in distance of two weeks
-// 		console.log("after->"+time)
+		labels.push(time.valueOf());
+		stats[time.valueOf()]=0;
+		statsS[time.valueOf()]=0;
+		time=new Date(time.valueOf()+itime.valueOf()); //generate dates in distance of interval
 	}
-	
 	
 	for(var i in threads[thread_id].messages) //matching each message to apropirate date
 	{
-		var plain_date=new Date(0); //it has time=0:00:00.000 (UTC)
+		pbar.tick();
 		var msg_date=new Date(threads[thread_id].messages[i].time);
-		plain_date.setUTCDate(msg_date.getUTCDate())  //setting date to the same as in message
-		plain_date.setUTCMonth(msg_date.getUTCMonth())
-		plain_date.setUTCFullYear(msg_date.getUTCFullYear()) 
-		plain_date=move_date_back(plain_date, plain_date.getUTCDay()) //moving it back to first day of the week
-		
-		if(!(stats.hasOwnProperty(plain_date))) //it may be between two dates in array (because i'm making two-week summary)
-		{
-			plain_date=move_date_back(plain_date, 7) //so i'm moving it back for one week
-		}
+		msg_date=msg_date.valueOf();
+		var m_label=labels[match_date(labels, msg_date)] //find matching date
 		
 		if(threads[thread_id].messages[i].author==you) //checking it message was sent or received
 		{
-			statsS[plain_date]++ //threads[thread_id].messages[i].body.length; //incrementing amount of messages
+			statsS[m_label]++ //threads[thread_id].messages[i].body.length; //incrementing amount of messages
 		}
-		stats[plain_date]++ //threads[thread_id].messages[i].body.length
+		stats[m_label]++ //threads[thread_id].messages[i].body.length
 	}
 
-	/*generating html (problably only temporary)*/
-	
-	var tmphtml=fs.readFileSync("line-time-scale.html").toString(); //reading model html
-
-	var labels=[], dataB=[], dataS=[], dataR=[];
+	var dataB=[], dataS=[], dataR=[];
 
 	for(var i in stats) //generating strings filled with data
 	{
 		var tmpd=new Date(i);
-		labels.push(tmpd.valueOf());
 		dataB.push(stats[i]);
 		dataS.push(statsS[i]);
 		dataR.push(stats[i]-statsS[i]);
 	}
-
 	console.log("done");
 	
 	return {"labels": labels,
@@ -137,8 +155,11 @@ function weekly_stats(thread_id)
 
 function hour_stats()
 {
-	console.log("Generating hour stats..")
 	var messages_hour={}
+	
+	console.log("Generating hour stats")
+	var pbar = new ProgressBar('[:bar] :percent', { total: threads.length, current: 0, width: 25, clear:true });
+	
 	for(var i=0; i<24; i++)
 	{
 		messages_hour[i]=0;
@@ -146,6 +167,7 @@ function hour_stats()
 	
 	for(var thread_id in threads)
 	{
+		pbar.tick();
 		for(var msg in threads[thread_id].messages)
 		{
 			var msg_date=new Date(threads[thread_id].messages[msg].time);
@@ -160,21 +182,65 @@ function hour_stats()
 		labels.push(i+":00")
 	}
 	
-// 	console.log(messages_hour)
-	
 	console.log("done.")
 	
 	return {"data": data, "labels": labels}
+}
+
+var word_array=[];
+
+function words_stats()
+{
+	var words={};
 	
+	console.log("Generating words stats")
+	var pbar = new ProgressBar('[:bar] :percent', { total: threads.length, current: 0, width: 25, clear:true });
+	
+	for(var thread_id in threads)
+	{
+		pbar.tick()
+		for(var msg in threads[thread_id].messages)
+		{
+			var tw=threads[thread_id].messages[msg].body.split(" ");
+			for(var w in tw)
+			{
+				if(tw[w].length<1) continue;
+				
+				tmpw=tw[w].toLowerCase();
+				
+// 				if(tmpw.search(/m+e+h+/im)==-1) continue;
+				
+// 				tmpw=tw[w]
+				
+				if(words.hasOwnProperty(tmpw))
+					words[tmpw]++;
+				else
+					words[tmpw]=1;
+			}
+		}
+	}
+	
+	console.log("sorting them...")
+	
+	for(var k in words)
+	{
+		word_array.push({"word":k, "count": words[k]});
+	}
+	word_array.sort(function(a, b){return b.count-a.count})
+	
+	console.log("done.")
 }
 
 var messages_conversation=[]
 
 function messages_per_conversation()
 {
-	console.log("generating global stats..")
+	console.log("Generating global stats")
+	var pbar = new ProgressBar('[:bar] :percent', { total: threads.length, current: 0, width: 25, clear:true });
+	
 	for(var i in threads)
 	{
+		pbar.tick()
 		var sent_chars=0, sent_words=0, sent_messages=0;
 		var received_chars=0, received_words=0, received_messages=0;
 		for (var msg in threads[i].messages)
@@ -215,87 +281,11 @@ function messages_per_conversation()
 	console.log("done.")
 }
 
-/*actually dropped*/
-// function month_stats(thread_id)
-// {
-// 	var stats=[];
-// 	var statsS=[];
-// 	var time=new Date(threads[thread_id].first_message);
-// 	time.setUTCDate(1);
-// 	time.setUTCHours(0);
-// 	time.setUTCMinutes(0);
-// 	time.setUTCSeconds(0);
-// 	time.setUTCMilliseconds(0);
-// 	
-// 	var tmonth=time.getUTCMonth();
-// 	var tyear =time.getUTCFullYear();
-// 	var now=new Date();
-// 	
-// 	while(time<=now)
-// 	{
-// 		time.setUTCMonth(tmonth++);
-// 		time.setUTCFullYear(tyear);
-// 		if(tmonth==12)
-// 		{
-// 			tmonth=0;
-// 			tyear++;
-// 		}
-// // 		console.log(time)
-// 		
-// 		stats[time]=0;
-// 		statsS[time]=0;
-// 	}
-// 	
-// 	for(var i in threads[thread_id].messages)
-// 	{
-// 		var plain_date=new Date(0);
-// 		var msg_date=new Date(threads[thread_id].messages[i].time);
-// 		plain_date.setUTCMonth(msg_date.getUTCMonth())
-// 		plain_date.setUTCFullYear(msg_date.getUTCFullYear())
-// 		stats[plain_date]++;
-// 		if(threads[thread_id].messages[i].author==you)
-// 		{
-// 			statsS[plain_date]++;
-// 		}
-// // 		console.log(plain_date)
-// 	}
-// // 	console.log(stats);
-//
-//
-//
-// 	var tmphtml=fs.readFileSync("line-time-scale.html").toString();
-// 
-// 	var dates="[", data="[", dataS="[", dataR="[";
-// 
-// 	for(var i in stats)
-// 	{
-// 	// 	dates+='"'+i+'", ';
-// 		var tmpd=new Date(i);
-// 		dates+=tmpd.valueOf()+", ";
-// 		data+=stats[i]+", ";
-// 	}
-// 
-// 	dates=dates.slice(0, -2)+"]";
-// 	data=data.slice(0, -2)+"]";
-// 
-// // 	console.log(dates);
-// // 	console.log(data);
-// 
-// 	tmphtml=tmphtml.replace("##dates", dates);
-// 	tmphtml=tmphtml.replace("##data", data);
-// 
-// 	console.log("done")
-// 	
-// 	return tmphtml;
-// 	// 	return stats;
-// }
-
-// fs.writeFile("chart.html", tmphtml)
-
-
 messages_per_conversation();
 
-hour_stats();
+// hour_stats();
+
+words_stats();
 
 console.log("Server ready.")
 
@@ -309,6 +299,10 @@ var server=http.createServer(function(req, res)
 	else if(req.url=="/messages_per_conversation")
 	{
 		res.end(JSON.stringify(messages_conversation));
+	}
+	else if(req.url=="/word_stats")
+	{
+		res.end(JSON.stringify(word_array));
 	}
 	else if(req.url!="/favicon.ico")
 	{
@@ -344,7 +338,7 @@ wsServer.on('request', function(r)
 			return;
 		}
 		
-		if(data.type=="weekly_stats")
+		if(data.type=="conversation_stats")
 		{
 			var thread_id=find_thread(data.participants)
 			if(thread_id==-1)
@@ -354,9 +348,9 @@ wsServer.on('request', function(r)
 				return;
 			}
 			
-			var wyn=weekly_stats(thread_id)
+			var wyn=conversation_stats(thread_id, data.interval)
 			
-			wyn={"type": "weekly_stats",
+			wyn={"type": "conversation_stats",
 					"dataR": wyn.dataR,
 					"dataS": wyn.dataS,
 					"dataB": wyn.dataB,

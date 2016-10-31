@@ -43,6 +43,10 @@
 		#global_stats  tr:hover :nth-child(n+10):nth-child(-n+13){
 			background-color: #023D02;
 		}
+		
+		#word_stats td{ 
+			padding:5px; border:#4433FF 1px solid;
+		}
 	</style>
 	<meta charset="UTF-8">
   </head>
@@ -52,6 +56,7 @@
   
   <input id="participants" list="people_list" autofocus>
   <datalist id="people_list"></datalist>
+  <input type="number" id="interval" min="1" max="365" value=14>
 	<button onclick="generate_chart()">Generate chart</button>
 	<button onclick="generate_hour_chart()">Generate hour stats (global only)</button>
 
@@ -64,6 +69,7 @@
 	Wysłane:<input type="checkbox" id="display_sent" checked onclick="display_sent()">
 	
 	<div id="global_stats">Loading stats...</div>
+	<div id="word_stats">Loading stats...</div>
 	
 	
 	
@@ -78,7 +84,7 @@
 		console.log(msg);
 		
 		
-		if(msg.type=="weekly_stats")
+		if(msg.type=="conversation_stats")
 		{
 			received_cfg.data=msg.dataR;
 			sent_cfg.data=msg.dataS;
@@ -133,8 +139,9 @@
 	
 	function generate_chart()
 	{
-		var message={"type": "weekly_stats",
-					"participants": document.getElementById('participants').value.split(", ")}
+		var message={"type": "conversation_stats",
+					"participants": document.getElementById('participants').value.split(", "),
+					"interval": document.getElementById('interval').value}
 		send(JSON.stringify(message));
 	}
 	
@@ -327,10 +334,15 @@
 		xhr.onload=function()
 		{
 			var tmp=JSON.parse(xhr.responseText);
-			console.log("Got: "+tmp);
+// 			console.log("Got: "+tmp);
+			
+			var ccount=0;
 			
 			for(i in tmp)
 			{
+				ccount++;
+				if(ccount>15) break;
+				
 				var sent_messages_percent=(tmp[i].sent_messages*100/tmp[i].messages).toFixed(1);
 				var sent_words_percent=(tmp[i].sent_words*100/(tmp[i].sent_words+tmp[i].received_words)).toFixed(1)
 				var sent_chars_percent=(tmp[i].sent_chars*100/(tmp[i].sent_chars+tmp[i].received_chars)).toFixed(1)
@@ -419,6 +431,47 @@
 		xhr.send();
 	}
 	global_stats();
+	
+	</script>
+	
+	
+	<script> /*Word stats*/
+	
+	function word_stats() //function gets data from server and generate table.
+	{
+		var wyn='<table id="word_stats" style="border-collapse:collapse;"><tr><th>Word</th><th>Occurences</th></tr>';
+		xhr1 = new XMLHttpRequest();
+		xhr1.open('GET', '/word_stats');
+		xhr1.onload=function()
+		{
+			var tmp=JSON.parse(xhr1.responseText);
+// 			console.log("Got: "+tmp);
+			
+			var ccount=0;
+			
+			for(i in tmp)
+			{
+				ccount++;
+				if(ccount>50) break;
+			
+				wyn+="<tr>"
+				
+				wyn+='<td style="word-wrap:break-word; max-width: 300px;">'+tmp[i].word+"</td>"
+				
+				wyn+="<td>";
+				
+				wyn+=tmp[i].count;
+				
+				wyn+="</td>"
+				
+				wyn+="</tr>"
+			}
+		wyn+="</table>"
+			document.getElementById('word_stats').innerHTML=wyn;
+		}
+		xhr1.send();
+	}
+	word_stats();
 	
 	</script>
 	
