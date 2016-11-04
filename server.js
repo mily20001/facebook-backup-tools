@@ -8,24 +8,56 @@ var you=""
 if(you.length<2)
 	throw "Enter your name in 4th line!"
 	
-console.log("Loading parsed JSON...")
+/********* Loading ****************/
+	
+var SERVER_LOADING=1;
 
-var threads=JSON.parse(fs.readFileSync("parsed.json"))
+console.log("Starting http server..")
 
-console.log("Loaded "+threads.length+" threads.")
+var ws_clients=[];
+var ws_clients_count=0;
 
+var server=http.createServer(http_server).listen(8097);
 
-//generating list of conversations
+function send_progress(percent, ws_id)
+{
+	ws_clients[ws_id].sendUTF(JSON.stringify({"type":"progress", "percent":percent}));
+}
 
+wsServer = new WebSocketServer({
+	httpServer: server
+});
+
+wsServer.on('request', ws_request_function);
+
+console.log("done.");
+
+var threads;
 var people="";
+var messages_conversation=[]
+var word_array=[];
+
+	
+console.log("Loading parsed JSON...")
+threads=JSON.parse(fs.readFileSync("parsed.json"));
+console.log("Loaded "+threads.length+" threads.")
 for(var i in threads)
 {
 	var tmp=threads[i].participants;
 	
 		people+='<option value="'+tmp.join(", ")+'">\n'
 }
+	
+words_stats();
 
+messages_per_conversation();
 
+SERVER_LOADING=false;
+
+console.log("Server ready.")
+
+/************** Functions **********************/
+	
 function find_thread(participants)
 {
 	for(var i in threads)
@@ -92,7 +124,7 @@ function match_date(labels, date) /*welp*/
 	return binSearch(labels, date)
 }
 
-function conversation_stats(thread_id, interval) 
+function conversation_stats(thread_id, interval, chart_type, ws_id) 
 {
 	interval=parseInt(interval)
 	console.log("Generating conversation stats (interval="+interval+")")
@@ -120,18 +152,36 @@ function conversation_stats(thread_id, interval)
 		time=new Date(time.valueOf()+itime.valueOf()); //generate dates in distance of interval
 	}
 	
+	var last_percent=0;
+	send_progress(0, ws_id)
+	
 	for(var i in threads[thread_id].messages) //matching each message to apropirate date
 	{
 		pbar.tick();
+		if(parseInt(i*100/threads[thread_id].messages.length)!=last_percent)
+		{
+			send_progress(i*100/threads[thread_id].messages.length, ws_id)
+			last_percent=parseInt(i*100/threads[thread_id].messages.length);
+		}
 		var msg_date=new Date(threads[thread_id].messages[i].time);
 		msg_date=msg_date.valueOf();
 		var m_label=labels[match_date(labels, msg_date)] //find matching date
 		
+		var increment;
+		if(chart_type=="messages")
+			increment=1;
+		else if(chart_type=="words")
+			increment=threads[thread_id].messages[i].body.split(" ").length;
+		else if(chart_type=="chars")
+			increment=threads[thread_id].messages[i].body.length;
+		else
+			increment=0; //should not happen
+		
 		if(threads[thread_id].messages[i].author==you) //checking it message was sent or received
 		{
-			statsS[m_label]++ //threads[thread_id].messages[i].body.length; //incrementing amount of messages
+			statsS[m_label]+=increment
 		}
-		stats[m_label]++ //threads[thread_id].messages[i].body.length
+		stats[m_label]+=increment
 	}
 
 	var dataB=[], dataS=[], dataR=[];
@@ -144,6 +194,8 @@ function conversation_stats(thread_id, interval)
 		dataR.push(stats[i]-statsS[i]);
 	}
 	console.log("done");
+	
+	send_progress(0, ws_id);
 	
 	return {"labels": labels,
 					"dataB": dataB,
@@ -187,14 +239,14 @@ function hour_stats()
 	return {"data": data, "labels": labels}
 }
 
-var word_array=[];
 
 function words_stats()
 {
 	var words={};
+	var words_count=0;
 	
 	console.log("Generating words stats")
-	var pbar = new ProgressBar('[:bar] :percent', { total: threads.length, current: 0, width: 25, clear:true });
+	var pbar = new ProgressBar('[:bar] :percent', { total: threads.length*2, width: 25, clear:true });
 	
 	for(var thread_id in threads)
 	{
@@ -215,23 +267,29 @@ function words_stats()
 				if(words.hasOwnProperty(tmpw))
 					words[tmpw]++;
 				else
+				{
+					words_count++;
 					words[tmpw]=1;
+				}
 			}
 		}
 	}
 	
-	console.log("sorting them...")
+	pbar = new ProgressBar('[:bar] :percent', { total: words_count*2, width: 25, clear:true });
+	pbar.tick(words_count)
 	
 	for(var k in words)
 	{
+		pbar.tick()
 		word_array.push({"word":k, "count": words[k]});
 	}
+	console.log("Found "+words_count+" unique words")
+	console.log("sorting them...")
 	word_array.sort(function(a, b){return b.count-a.count})
 	
 	console.log("done.")
 }
 
-var messages_conversation=[]
 
 function messages_per_conversation()
 {
@@ -281,46 +339,38 @@ function messages_per_conversation()
 	console.log("done.")
 }
 
-messages_per_conversation();
+/**************** http functions ******************/
 
-// hour_stats();
-
-words_stats();
-
-console.log("Server ready.")
-
-var server=http.createServer(function(req, res)
+function http_server(req, res)
 {
 	console.log("req:"+decodeURI(req.url))
-	if(req.url=='/')
+	if(SERVER_LOADING)
 	{
-		res.end(fs.readFileSync("index.html"))
+		res.end(fs.readFileSync("loading.html"))
 	}
-	else if(req.url=="/messages_per_conversation")
+	else
 	{
-		res.end(JSON.stringify(messages_conversation));
+		if(req.url=='/')
+		{
+			res.end(fs.readFileSync("index.html"))
+		}
+		else if(req.url=="/messages_per_conversation")
+		{
+			res.end(JSON.stringify(messages_conversation));
+		}
+		else if(req.url=="/word_stats")
+		{
+			res.end(JSON.stringify(word_array));
+		}
+		else if(req.url!="/favicon.ico")
+		{
+			res.end(" ");
+		}
 	}
-	else if(req.url=="/word_stats")
-	{
-		res.end(JSON.stringify(word_array));
-	}
-	else if(req.url!="/favicon.ico")
-	{
-		res.end(0);
-		//its really lame, but for early tests works good, has no support of group conversations, and conversations with yourself :(
-// 		res.end(weekly_stats(find_thread([you, decodeURI(req.url).substring(1)]).toString())) //dropped (yay)
-	}
-}).listen(8097);
+}
 
 
-wsServer = new WebSocketServer({
-	httpServer: server
-});
-
-var ws_clients=[];
-var ws_clients_count=0;
-
-wsServer.on('request', function(r)
+function ws_request_function(r)
 {
 	var connection = r.accept('fb_stats', r.origin);
 	var id = ws_clients_count++;
@@ -331,6 +381,8 @@ wsServer.on('request', function(r)
 	{
 		console.log("Recived message: "+message.utf8Data);
 		var data=JSON.parse(message.utf8Data);
+		
+		if(SERVER_LOADING) return;
 		
 		if(!data.hasOwnProperty("type"))
 		{
@@ -348,7 +400,7 @@ wsServer.on('request', function(r)
 				return;
 			}
 			
-			var wyn=conversation_stats(thread_id, data.interval)
+			var wyn=conversation_stats(thread_id, data.interval, data.chart_type, id)
 			
 			wyn={"type": "conversation_stats",
 					"dataR": wyn.dataR,
@@ -384,5 +436,6 @@ wsServer.on('request', function(r)
 		console.log((new Date())+' Peer '+connection.remoteAddress+' disconnected.');
 	});
 	
-	 console.log((new Date())+' Connection accepted ['+id+']');
-});
+	console.log((new Date())+' Connection accepted ['+id+']');
+}
+
