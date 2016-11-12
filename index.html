@@ -14,7 +14,7 @@
     color: white;
 		}
 			
-		#canvas {
+		#chart_canvas {
 			background-color: rgba(0, 0, 0, 0.9);
 		}
 			
@@ -64,6 +64,43 @@
 /* 			-webkit-transition: width 0.1s; /* Safari */ 
 /*  			transition: width 0.1s; */ 
 		}
+		
+		#conversation
+		{
+		font:16px/26px Georgia, Garamond, Serif;
+/* 			display: none; */
+			color: #000;
+			width: 400px;
+			height: 600px;
+			overflow: auto;
+			border:1px solid #ccc;
+		}
+		
+		.message_info
+		{
+			font-size:11;
+			font-style: italic
+		}
+		
+		.your_message
+		{
+			
+			text-align:right;
+			background-color:#00CC00;
+			margin-left: 17px;
+		/* 	margin-right: 2px; */
+			margin-bottom: 7px;
+			margin-top:7px;
+		}
+		.not_your_message
+		{
+			text-align:left;
+			background-color:#4169E1;
+			margin-right: 17px;
+		/* 	margin-left: 2px; */
+			margin-bottom: 7px;
+			margin-top:7px;
+		}
 	</style>
 	<meta charset="UTF-8">
   </head>
@@ -76,13 +113,19 @@
   <datalist id="people_list"></datalist>
   <input type="number" id="interval" min="1" max="365" value=14>
 	<button onclick="generate_chart()">Generate chart</button>
-	<button onclick="generate_hour_chart()">Generate hour stats (global only)</button> <br>
+	<button onclick="generate_hour_chart()">Generate hour stats (global only)</button>
+	<button onclick="all_conversation_stats()">Generate ALL converstions chart</button>
+	<button onclick="get_conversation()">Get conversation</button>
+	<input type="number" id="first_message" min="0" max="10000000" value=0>
+	<input type="number" id="message_count" min="0" max="10000000" value=150>  <br>
 	<input type="radio" checked name="chart_type" value="messages"> Messages 
   <input type="radio" name="chart_type" value="words"> Words 
   <input type="radio" name="chart_type" value="chars"> Chars 
 	<div style="width:98%;">
-		<canvas id="canvas"></canvas>
+		<canvas id="chart_canvas"></canvas>
 	</div>
+	
+	<div id="conversation"></div>
 	
 	<br>
 	
@@ -105,6 +148,7 @@
 			
 			if(msg.type=="conversation_stats")
 			{
+				document.getElementById("chart_canvas").style.display="initial";
 				received_cfg.data=msg.dataR;
 				sent_cfg.data=msg.dataS;
 				time_line_chart_config.data.datasets[0].data=msg.dataR
@@ -117,7 +161,26 @@
 				else
 				{
 					window.myLine.destroy();
-					var ctx=document.getElementById("canvas").getContext("2d");
+					var ctx=document.getElementById("chart_canvas").getContext("2d");
+					window.myLine=new Chart(ctx, time_line_chart_config);
+				}
+			}
+			else if(msg.type=="all_conversation_stats")
+			{
+				document.getElementById("chart_canvas").style.display="initial";
+				received_cfg.data=msg.dataR;
+				sent_cfg.data=msg.dataS;
+				time_line_chart_config.data.datasets[0].data=msg.dataR
+				time_line_chart_config.data.datasets[1].data=msg.dataS
+				time_line_chart_config.data.datasets[2].data=msg.dataB; /*FIXME hardcoded :( */
+				time_line_chart_config.data.labels=msg.labels
+				
+				if(window.myLine.chart.config.type=="line") /*if other type, then regenerate chart*/
+					window.myLine.update();
+				else
+				{
+					window.myLine.destroy();
+					var ctx=document.getElementById("chart_canvas").getContext("2d");
 					window.myLine=new Chart(ctx, time_line_chart_config);
 				}
 			}
@@ -127,6 +190,7 @@
 			}
 			else if(msg.type=="hour_stats")
 			{
+				document.getElementById("chart_canvas").style.display="initial";
 				bar_chart_config.data.labels=msg.labels;
 				bar_chart_config.data.datasets[0].data=msg.data
 				
@@ -135,13 +199,42 @@
 				else
 				{
 					window.myLine.destroy();
-					var ctx=document.getElementById("canvas").getContext("2d");
+					var ctx=document.getElementById("chart_canvas").getContext("2d");
 					window.myLine=new Chart(ctx, bar_chart_config);
 				}
 			}
 			else if(msg.type=="progress")
 			{
 				set_progress(msg.percent);
+			}
+			else if(msg.type=="conversation")
+			{
+				document.getElementById("chart_canvas").style.display="none";
+				var c_div=document.getElementById("conversation");
+				
+// 				c_div.style.display="initial"
+				
+				var tmp="", you=msg.you;
+				
+				for(var i in msg.messages)
+				{
+					var tmp2='<div class="message">'
+					if(msg.messages[i].author==you)
+						tmp2+='<div class="your_message"><div class="body">';
+					else
+						tmp2+='<div class="not_your_message"><div class="body">';
+					tmp2+=msg.messages[i].body;
+					
+					tmp2+='</div><div class="message_info">'
+					
+					tmp2+=msg.messages[i].time;
+					
+					tmp2+='</div></div>'
+					
+					tmp+=tmp2;
+				}
+				
+				c_div.innerHTML=tmp;
 			}
 		}
 		catch(err)
@@ -184,9 +277,35 @@
 		send(JSON.stringify(message));
 	}
 	
+	function all_conversation_stats()
+	{
+		var chart_type;
+		for(var i in document.getElementsByName('chart_type'))
+		{
+			if(document.getElementsByName('chart_type')[i].type==='radio' && document.getElementsByName('chart_type')[i].checked)
+			{
+				chart_type=document.getElementsByName('chart_type')[i].value;
+			}
+		}
+		
+		var message={"type": "all_conversation_stats",
+					"interval": document.getElementById('interval').value,
+					"chart_type": chart_type}
+		send(JSON.stringify(message));
+	}
+	
 	function generate_hour_chart()
 	{
 		send(JSON.stringify({type: "hour_stats"}))
+	}
+	
+	function get_conversation()
+	{
+		send(JSON.stringify({"type": "conversation",
+												"participants": document.getElementById('participants').value.split(", "),
+												"first_msg": document.getElementById('first_message').value, 
+												"msg_count": document.getElementById('message_count').value
+												}))
 	}
 	
 	send(JSON.stringify({"type": "people"}))
@@ -317,7 +436,7 @@
 	
 	
 	window.onload = function() {
-		var ctx = document.getElementById("canvas").getContext("2d");
+		var ctx = document.getElementById("chart_canvas").getContext("2d");
 		window.myLine = new Chart(ctx, time_line_chart_config);
 
 	};
@@ -395,7 +514,7 @@
 			
 				wyn+="<tr>"
 				
-				wyn+='<td style="word-wrap:break-word; max-width: 300px;">'+tmp[i].participants+"</td>"
+				wyn+='<td style="word-wrap:break-word; max-width: 300px;" onclick="document.getElementById(\'participants\').value=\''+tmp[i].participants.join(", ")+'\'; generate_chart()">'+tmp[i].participants.join(", ")+"</td>"
 				
 				wyn+="<td>";
 				

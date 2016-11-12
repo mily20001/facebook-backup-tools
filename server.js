@@ -124,6 +124,107 @@ function match_date(labels, date) /*welp*/
 	return binSearch(labels, date)
 }
 
+function all_conversation_stats(interval, chart_type, ws_id)
+{
+	console.log("Generating ALL conversation stats (interval="+interval+")")
+	var firstest_message=new Date();
+	var all_messages_count=0;
+	for(var i in threads)
+	{
+		var time=new Date(threads[i].first_message);
+		if(time<firstest_message)
+		{
+			firstest_message=time;
+		}
+		all_messages_count+=threads[i].messages.length;
+	}
+	
+	console.log("first message ever @ "+firstest_message)
+	console.log("you have "+all_messages_count+" messages")
+	
+	interval=parseInt(interval)
+	
+	var pbar = new ProgressBar('[:bar] :percent :etas', { total: all_messages_count, current: 0, width: 30, clear:true });
+	var stats={}; //sum of sent and recived messages/chars/words per interval
+	var statsS={}; //sent messages/chars/words per interval
+	var labels=[];
+	
+	firstest_message.setUTCHours(0);
+	firstest_message.setUTCMinutes(0);
+	firstest_message.setUTCSeconds(0);
+	firstest_message.setUTCMilliseconds(0);
+	var time=firstest_message;
+	
+	var now=new Date();
+	
+	var itime=new Date(0) /*interval time*/
+	itime.setUTCDate(1+interval);
+	
+	while(time<=now) //generate and 0fill arrays
+	{
+		labels.push(time.valueOf());
+		stats[time.valueOf()]=0;
+		statsS[time.valueOf()]=0;
+		time=new Date(time.valueOf()+itime.valueOf()); //generate dates in distance of interval
+	}
+	
+	var last_percent=0;
+	var processed_messages=0;
+	send_progress(0, ws_id)
+	
+	for(var thread_id in threads)
+	{
+		for(var i in threads[thread_id].messages) //matching each message to apropirate date
+		{
+			pbar.tick();
+			if(parseInt(100*processed_messages/all_messages_count)!=last_percent)
+			{
+				send_progress(100*processed_messages/all_messages_count, ws_id)
+				last_percent=parseInt(100*processed_messages/all_messages_count);
+			}
+			processed_messages++;
+			var msg_date=new Date(threads[thread_id].messages[i].time);
+			msg_date=msg_date.valueOf();
+			var m_label=labels[match_date(labels, msg_date)] //find matching date
+			
+			var increment;
+			if(chart_type=="messages")
+				increment=1;
+			else if(chart_type=="words")
+				increment=threads[thread_id].messages[i].body.split(" ").length;
+			else if(chart_type=="chars")
+				increment=threads[thread_id].messages[i].body.length;
+			else
+				increment=0; //should not happen
+			
+			if(threads[thread_id].messages[i].author==you) //checking it message was sent or received
+			{
+				statsS[m_label]+=increment
+			}
+			stats[m_label]+=increment
+		}
+	}
+
+	var dataB=[], dataS=[], dataR=[];
+
+	for(var i in stats) //generating strings filled with data
+	{
+		var tmpd=new Date(i);
+		dataB.push(stats[i]);
+		dataS.push(statsS[i]);
+		dataR.push(stats[i]-statsS[i]);
+	}
+	console.log("done");
+	
+	send_progress(0, ws_id);
+	
+	return {"labels": labels,
+					"dataB": dataB,
+					"dataS": dataS,
+					"dataR": dataR
+	};
+}
+
 function conversation_stats(thread_id, interval, chart_type, ws_id) 
 {
 	interval=parseInt(interval)
@@ -339,6 +440,24 @@ function messages_per_conversation()
 	console.log("done.")
 }
 
+
+function get_conversation(thread_id, first_msg, msg_count)
+{
+	first_msg=parseInt(first_msg);
+	msg_count=parseInt(msg_count);
+	
+	if(threads[thread_id].messages.length<(first_msg+msg_count))
+		return {"error": "out of range message requested"};
+	
+	var wyn=[];
+	
+	for(var i=0; i<msg_count; i++)
+	{
+		wyn.push(threads[thread_id].messages[threads[thread_id].messages.length-(first_msg+i+1)]);
+	}
+	return {"messages": wyn}
+}
+
 /**************** http functions ******************/
 
 function http_server(req, res)
@@ -411,6 +530,19 @@ function ws_request_function(r)
 			
 			ws_clients[id].sendUTF(JSON.stringify(wyn))
 		}
+		else if(data.type=="all_conversation_stats")
+		{
+			var wyn=all_conversation_stats(data.interval, data.chart_type, id)
+			
+			wyn={"type": "all_conversation_stats",
+					"dataR": wyn.dataR,
+					"dataS": wyn.dataS,
+					"dataB": wyn.dataB,
+					"labels": wyn.labels
+					}
+			
+			ws_clients[id].sendUTF(JSON.stringify(wyn))
+		}
 		else if(data.type=="hour_stats")
 		{
 			var wyn=hour_stats()
@@ -419,6 +551,31 @@ function ws_request_function(r)
 					"labels": wyn.labels
 					}
 				ws_clients[id].sendUTF(JSON.stringify(wyn))
+		}
+		else if(data.type=="conversation")
+		{
+			var thread_id=find_thread(data.participants)
+			if(thread_id==-1)
+			{
+				console.log("thread "+data.participants+" not found")
+				ws_clients[id].sendUTF(JSON.stringify({"error": "requested thread not found"}))
+				return;
+			}
+			var wyn=get_conversation(thread_id, data.first_msg, data.msg_count);
+			
+			if(wyn.hasOwnProperty("error"))
+			{
+				ws_clients[id].sendUTF(JSON.stringify({"error": "error while handling request ("+wyn.error+")"}))
+				return;
+			}
+			
+			wyn={"type": "conversation",
+					"participants": data.participants,
+					"messages":wyn.messages,
+					"you":you
+					}
+			
+			ws_clients[id].sendUTF(JSON.stringify(wyn));
 		}
 		else if(data.type=="people")
 		{
