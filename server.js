@@ -3,11 +3,13 @@ var http=require("http")
 var WebSocketServer=require('websocket').server;
 var ProgressBar = require('progress');
 
-var you=""
+var you=fs.readFileSync("your.name").toString().replace(' \n', "").replace('\n', "");
 
 if(you.length<2)
 	throw "Enter your name in 4th line!"
-	
+
+console.log("Hello '"+you+"'!")
+
 /********* Loading ****************/
 	
 var SERVER_LOADING=1;
@@ -480,6 +482,14 @@ function http_server(req, res)
 		else if(req.url=="/word_stats")
 		{
 			res.end(JSON.stringify(word_array));
+		}
+		else if(req.url=="/index.js")
+		{
+			res.end(fs.readFileSync("index.js"))
+		}
+		else if(req.url=="/style.css")
+		{
+			res.end(fs.readFileSync("style.css"))
 		}
 		else if(req.url!="/favicon.ico")
 		{
