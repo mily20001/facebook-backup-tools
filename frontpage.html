@@ -1,0 +1,57 @@
+<html>
+	<head>
+		<title></title>
+		<meta content="">
+		<meta charset="UTF-8">
+		<link rel="stylesheet" type="text/css" href="./css/buttons.css">
+		<link rel="stylesheet" type="text/css" href="./css/completion.css">
+		<style>
+			body
+			{
+				background-color: black;
+				color: white;
+			}
+
+			#main_menu
+			{
+				height:auto;
+				width: 400px;
+				left:50%;
+				top: 50%;
+				margin: -100px 0 0 -250px;
+				position: absolute;
+			}
+
+			#hider1
+			{
+				height: 25px;
+				transition: all 0.4s ease-out;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+	<body>
+	<br><br>
+	<div id="main_menu">
+		<div class="button_container" id="cat_choose" style="left:50px"> <div class="chooser"></div>
+			<div class="button" data-chooser_color="red" onclick="hider1(false)">Global</div>
+			<div class="button" data-chooser_color="blue" onclick="hider1(true)">Individual</div>
+		</div>
+		<br>
+		<div id="hider1">
+			<div class="style-1">
+				<div class="completion_div">
+					<div class="not_focused_completion_div" id="completion_div1">
+						<input id="texttest" onkeyup="check_text(true)" onFocus="completion_div_focus(true, this); check_text(true)" onBlur="completion_div_focus(false, this); check_text(false)" type="text" placeholder="Enter name">
+						<div id="cmpltions"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<br>
+		<div class="single_button" id="go_button" onmouseover='document.getElementById("go_button_bg").style.left=0' onmouseout='document.getElementById("go_button_bg").style.left="-310px"' style="left:50px"><div id="go_button_bg"></div><span id="go_span" onhover="console.log('xDDDDD')">Go</span></div>
+	</div>
+	
+	<script src="./js/frontpage.js"></script>
+	</body>
+</html>

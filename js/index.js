@@ -216,7 +216,7 @@ var time_line_chart_config={
 		labels: [0, Date.now()], // Date Objects
 		datasets: [
 		{
-			label: "Odebrane", //received messages
+			label: "Received", //received messages
 			borderColor: received_cfg.borderColor,
 			backgroundColor: received_cfg.backgroundColor,
 			pointBorderColor: received_cfg.pointBorderColor,
@@ -225,7 +225,7 @@ var time_line_chart_config={
 			data: received_cfg.data
 		},
 		{
-			label: "Wysłane", //sent messages
+			label: "Sent", //sent messages
 			borderColor: sent_cfg.borderColor,
 			backgroundColor: sent_cfg.backgroundColor,
 			pointBorderColor: sent_cfg.pointBorderColor,
@@ -234,7 +234,7 @@ var time_line_chart_config={
 			data: sent_cfg.data
 		},
 		{
-			label: "Łącznie", //sent+received
+			label: "Sum", //sent+received
 			borderColor: "rgba(0, 0, 255, 1)",
 			backgroundColor: "rgba(0, 0, 175, 0.4)",
 			pointBorderColor: "rgba(150, 220, 255, 1)",
@@ -247,7 +247,7 @@ var time_line_chart_config={
 		responsive: true,
 						title:{
 								display:true,
-								text:"Liczba wiadomości w dwutygodniowym okresie"
+								text:"Conversation stats"
 						},
 		scales: {
 			xAxes: [{
@@ -259,13 +259,13 @@ var time_line_chart_config={
 				},
 				scaleLabel: {
 					display: true,
-					labelString: 'Data'
+					labelString: 'Date'
 				}
 			}, ],
 			yAxes: [{
 				scaleLabel: {
 					display: true,
-					labelString: 'Liczba wiadomości' //amount of messages
+					labelString: 'Amount of messages' //amount of messages
 				}
 			}]
 		},

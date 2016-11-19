@@ -483,6 +483,10 @@ function http_server(req, res)
 		{
 			res.end(JSON.stringify(word_array));
 		}
+		else if(req.url=="/js/index.js" || req.url=="/css/style.css")
+		{
+			res.end(fs.readFileSync('.'+req.url))
+		}
 		else if(req.url=="/index.js")
 		{
 			res.end(fs.readFileSync("index.js"))
