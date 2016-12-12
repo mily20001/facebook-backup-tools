@@ -42,17 +42,20 @@ var word_array=[];
 	
 console.log("Loading parsed JSON...")
 threads=JSON.parse(fs.readFileSync("parsed.json"));
-console.log("Loaded "+threads.length+" threads.")
-for(var i in threads)
-{
-	var tmp=threads[i].participants;
-	
-		people+='<option value="'+tmp.join(", ")+'">\n'
-}
-	
-words_stats();
 
-messages_per_conversation();
+people=JSON.parse(fs.readFileSync("people_list.json"));
+
+// console.log("Loaded "+threads.length+" threads.")
+// for(var i in threads)
+// {
+// 	var tmp=threads[i].participants;
+// 	
+// 		people+='<option value="'+tmp.join(", ")+'">\n'
+// }
+	
+// words_stats();
+
+// messages_per_conversation();
 
 SERVER_LOADING=false;
 
@@ -462,6 +465,15 @@ function get_conversation(thread_id, first_msg, msg_count)
 
 /**************** http functions ******************/
 
+function contains(a, obj) {
+    for (var i = 0; i < a.length; i++) {
+        if (a[i] === obj) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function http_server(req, res)
 {
 	console.log("req:"+decodeURI(req.url))
@@ -483,17 +495,21 @@ function http_server(req, res)
 		{
 			res.end(JSON.stringify(word_array));
 		}
-		else if(req.url=="/js/index.js" || req.url=="/css/style.css")
+		else if(contains(["/js/frontpage.js", "/js/index.js", "/js/i_stats.js"], req.url))
 		{
 			res.end(fs.readFileSync('.'+req.url))
 		}
-		else if(req.url=="/index.js")
+		else if(contains(["/css/buttons.css", "/css/completion.css", "/css/i_stats.css", "/css/nav_buttons.css", "/css/nav_completion.css", "/css/style.css"], req.url))
 		{
-			res.end(fs.readFileSync("index.js"))
+			res.end(fs.readFileSync('.'+req.url))
 		}
-		else if(req.url=="/style.css")
+		else if(req.url.search("/i_stats.html")>-1)
 		{
-			res.end(fs.readFileSync("style.css"))
+			res.end(fs.readFileSync("i_stats.html"))
+		}
+		else if(req.url=="/frontpage.html")
+		{
+			res.end(fs.readFileSync("frontpage.html"))
 		}
 		else if(req.url!="/favicon.ico")
 		{
@@ -507,6 +523,8 @@ function ws_request_function(r)
 {
 	var connection = r.accept('fb_stats', r.origin);
 	var id = ws_clients_count++;
+	
+	var current_conversation_id=-1;
 	
 	ws_clients[id] = connection
 	
@@ -525,7 +543,13 @@ function ws_request_function(r)
 		
 		if(data.type=="conversation_stats")
 		{
-			var thread_id=find_thread(data.participants)
+			var thread_id;
+			
+			if(data.hasOwnProperty("participants"))
+				thread_id=find_thread(data.participants);
+			else
+				thread_id=data.thread_id;
+			
 			if(thread_id==-1)
 			{
 				console.log("thread "+data.participants+" not found")
@@ -591,9 +615,33 @@ function ws_request_function(r)
 			
 			ws_clients[id].sendUTF(JSON.stringify(wyn));
 		}
+		else if(data.type=="global_stats")
+		{
+			ws_clients[id].sendUTF(JSON.stringify({"type": "global_stats", "stats":JSON.parse(fs.readFileSync("global_stats.json"))}))
+		}
 		else if(data.type=="people")
 		{
-			ws_clients[id].sendUTF(JSON.stringify({"type": "people", "list":people}))
+			ws_clients[id].sendUTF(JSON.stringify({"type": "people", "people":people}))
+		}
+		else if(data.type=="get_name")
+		{
+			var names=threads[data.id].participants.slice(0);
+			names.splice(names.indexOf(you), 1);
+			
+			var msg={"type": "get_name",
+							 "names": names,
+			}
+			ws_clients[id].sendUTF(JSON.stringify(msg));
+		}
+		else if(data.type=="get_url")
+		{
+			var thread_id=find_thread(data.participants);
+			if(thread_id==-1)
+				console.log("Conversation doesn't exist :(");
+			else
+			{
+				ws_clients[id].sendUTF(JSON.stringify({"type":"redirect", "url":"http://127.0.0.1:8097/i_stats.html?"+thread_id}));
+			}
 		}
 		else
 		{

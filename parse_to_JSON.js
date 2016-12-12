@@ -1,6 +1,8 @@
 var fs=require("fs")
 var ProgressBar = require('progress');
 
+var generate_stats=1;
+
 console.log("opening file..")
 
 // var file=fs.readFileSync("test.html").toString()
@@ -154,6 +156,78 @@ for(var i in threads)
   }
 }
 
+function max(a, b)
+{
+	if(parseInt(a)>parseInt(b))
+		return a;
+	return b;
+}
+
+if(generate_stats)
+{
+	console.log("generating stats..");
+	var stats={}; //per conversation
+	var global_stats={};
+	var people_list=[];
+	
+	var plain_stats={
+		total_chars:0,
+		max_chars: 0,
+		total_words: 0,
+		max_words: 0,
+		longest_word: "",
+		longest_word_l: 0,
+		total_messages: 0,
+	}
+	
+	global_stats=JSON.parse(JSON.stringify(plain_stats)); //xD
+	
+	for(var thread in main)
+	{
+		people_list.push(main[thread].participants)
+		var c_stats=JSON.parse(JSON.stringify(plain_stats));
+		for(var message in main[thread].messages)
+		{
+			var chars=0, words=0;
+			chars=main[thread].messages[message].body.length;
+			words=main[thread].messages[message].body.split(" ");
+			for(var w in words)
+				if(words[w].length>c_stats.longest_word_l)
+				{
+					c_stats.longest_word_l=words[w].length;
+					c_stats.longest_word=words[w];
+				}
+			
+			c_stats.total_chars+=chars;
+			c_stats.total_words+=words.length;
+			c_stats.max_chars=max(c_stats.max_chars, chars);
+			c_stats.max_words=max(c_stats.max_words, words.length)
+		}
+		
+		c_stats.total_messages=main[thread].messages.length;
+		
+		global_stats.total_chars+=c_stats.total_chars;
+		global_stats.total_words+=c_stats.total_words;
+		global_stats.total_messages+=c_stats.total_messages;
+		global_stats.max_chars=max(c_stats.max_chars, global_stats.max_chars);
+		global_stats.max_words=max(c_stats.max_words, global_stats.max_words);
+		global_stats.longest_word_l=max(global_stats.longest_word_l, c_stats.longest_word_l);
+		
+		stats[main[thread].participants]=c_stats;
+// 		console.log("stats:")
+// 	console.log("Total words:"+c_stats.total_words+" Total chars:"+c_stats.total_chars+" Max chars per msg:"+c_stats.max_chars+" max words per msg:"+c_stats.max_words+" Longest word:"+c_stats.longest_word+"("+c_stats.longest_word_l+")")
+	}
+	console.log("global stats:")
+	console.log("Total words:"+global_stats.total_words+" Total chars:"+global_stats.total_chars+" Max chars per msg:"+global_stats.max_chars+" max words per msg:"+global_stats.max_words+" Longest word:"+global_stats.longest_word_l);
+	
+	fs.writeFile("people_list.json", JSON.stringify(people_list));
+	fs.writeFile("stats.json", JSON.stringify(stats));
+	fs.writeFile("global_stats.json", JSON.stringify(global_stats));
+}
+
+
+
+
 console.info("converting to JSON..")
 
 main=JSON.stringify(main)
@@ -162,4 +236,3 @@ console.info("saving..")
 
 fs.writeFile("parsed.json", main) //so slow
 
-// console.log("typed "+count+" chars")

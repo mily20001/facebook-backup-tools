@@ -1,3 +1,58 @@
+/* websocket */
+var completions=[];
+
+
+var ws = new WebSocket('ws://127.0.0.1:8097', 'fb_stats');
+ws.addEventListener("message", function(e)
+{
+	try{
+		var msg = JSON.parse(e.data);
+		console.log("Got data via websocket")
+		console.log("data: ")
+		console.log(msg);
+		
+		
+		if(msg.type=="people")
+		{
+			for(var i in msg.people)
+			{
+				completions.push(msg.people[i].join(", "))
+			}
+		}
+		if(msg.type=="global_stats")
+		{
+			document.getElementById("global_stats").innerHTML="Total messages: "+msg.stats.total_messages+" total words:"+msg.stats.total_words+" total chars:"+msg.stats.total_chars+" longest message:"+msg.stats.max_words+" words"
+		}
+		if(msg.type=="redirect")
+		{
+			window.location=msg.url;
+		}
+	}
+	catch(err)
+	{
+		console.log("error parsing message ("+err+"):")
+		console.log(e.data);
+	}
+});
+
+function send(message)
+{
+	if(ws.readyState!=ws.OPEN)
+	{
+		console.log("Queing message.")
+		setTimeout(send, 10, message);
+	}
+	else
+	{
+		console.log("Sending message: "+message)
+		ws.send(message);
+	}
+}
+
+send(JSON.stringify({"type": "people"}))
+
+send(JSON.stringify({"type": "global_stats"}))
+
 /*==================================================================================*
  *                                   Completion box                                 *
  *==================================================================================*/
@@ -13,22 +68,25 @@ function check_text(focused)
 	}
 	var tmp=completions.filter(function(element, index, array)
 	{
-		return (element.toString().toLowerCase().search(document.getElementById("texttest").value.toLowerCase())>-1) && index<15 /*max amount of sugesstions*/
+		return (element.toString().toLowerCase().search(document.getElementById("texttest").value.toLowerCase())>-1)
 	});
 	console.log(tmp);
 	
 	var tmphtml=""
 
+	var c_count=0; /*limit max amount of completions*/
+	
 	for(i in tmp)
 	{
-		tmphtml+='<div class="completion" onclick="complete(\''+tmp[i]+'\'); console.log(\'xD\')">'+tmp[i]+'</div>';
+		tmphtml+='<div class="completion" onclick="complete(\''+tmp[i]+'\');">'+tmp[i]+'</div>';
+		if(++c_count>=15) break;
 	}
 	
 	document.getElementById("cmpltions").innerHTML=tmphtml;
 	
-	document.getElementById("cmpltions").style.height=20*tmp.length;
+	document.getElementById("cmpltions").style.height=20*c_count;
 	
-	document.getElementById("hider1").style.height=20*tmp.length+27+"px";
+	document.getElementById("hider1").style.height=20*c_count+27+"px";
 	
 	if(tmp.length==0)
 	{
@@ -47,29 +105,6 @@ function complete(s)
 // 	check_text();
 }
 
-var completions=[
-"Penelope Canale",
-"Wendi Gehring",
-"Alix Reetz",
-"Bette Bromberg",
-"Enda Hertel",
-"Jamee Engels",
-"Raven Alcantara",
-"Bertha Burgoon",
-"Xiao Bolster",
-"Millard Harrelson",
-"Evita Mcauley",
-"Thelma Leja",
-"Annalisa Rollman",
-"Cortez Swart",
-"Jacalyn Stano",
-"Kathey Stinebaugh",
-"Jimmy Ripple",
-"Dean Colunga",
-"Mitchell Eccles",
-"Boyd Sheley",
-]
-
 function completion_div_focus(isIt, id)
 {
 	if(isIt)
@@ -81,7 +116,9 @@ function completion_div_focus(isIt, id)
 /*==================================================================================*
  *                                      Main menu                                   *
  *==================================================================================*/
-  
+
+var stats_type=0;
+
 function hider1(show)
 {
 	var el=document.getElementById("hider1");
@@ -93,6 +130,14 @@ function hider1(show)
 }
 
 hider1(false)
+
+function start()
+{
+	if(stats_type==1) //0 not supported yet
+	{
+		send(JSON.stringify({"type": "get_url", "participants": document.getElementById("texttest").value.split(", ")}))
+	}
+}
   
 /*==================================================================================*
  *                                  Multiple buttons                                *

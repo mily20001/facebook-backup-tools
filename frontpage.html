@@ -32,10 +32,11 @@
 	</head>
 	<body>
 	<br><br>
+	<div id="global_stats" style="text-align: center">lalaalal</div>
 	<div id="main_menu">
 		<div class="button_container" id="cat_choose" style="left:50px"> <div class="chooser"></div>
-			<div class="button" data-chooser_color="red" onclick="hider1(false)">Global</div>
-			<div class="button" data-chooser_color="blue" onclick="hider1(true)">Individual</div>
+			<div class="button" data-chooser_color="red" onclick="hider1(false); stats_type=0">Global</div>
+			<div class="button" data-chooser_color="blue" onclick="hider1(true); stats_type=1">Individual</div>
 		</div>
 		<br>
 		<div id="hider1">
@@ -49,7 +50,7 @@
 			</div>
 		</div>
 		<br>
-		<div class="single_button" id="go_button" onmouseover='document.getElementById("go_button_bg").style.left=0' onmouseout='document.getElementById("go_button_bg").style.left="-310px"' style="left:50px"><div id="go_button_bg"></div><span id="go_span" onhover="console.log('xDDDDD')">Go</span></div>
+		<div class="single_button" id="go_button" onmouseover='document.getElementById("go_button_bg").style.left=0' onmouseout='document.getElementById("go_button_bg").style.left="-310px"' onclick="start()" style="left:50px"><div id="go_button_bg"></div><span id="go_span">Go</span></div>
 	</div>
 	
 	<script src="./js/frontpage.js"></script>
