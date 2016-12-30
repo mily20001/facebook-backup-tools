@@ -30,6 +30,9 @@ ws.addEventListener("message", function(e)
 		}
 		if(msg.type=="conversation_stats")
 		{
+			document.getElementById("bodydiv").innerHTML='<div style="width:98%;"><canvas id="chart_canvas"></canvas></div>';
+			var ctx = document.getElementById("chart_canvas").getContext("2d");
+			window.myLine = new Chart(ctx, time_line_chart_config);
 			document.getElementById("chart_canvas").style.display="initial";
 			received_cfg.data=msg.dataR;
 			sent_cfg.data=msg.dataS;
@@ -46,6 +49,60 @@ ws.addEventListener("message", function(e)
 				var ctx=document.getElementById("chart_canvas").getContext("2d");
 				window.myLine=new Chart(ctx, time_line_chart_config);
 			}
+		}
+		else if(msg.type=="words_stats")
+		{
+			document.getElementById("bodydiv").innerHTML='<div id="word_stats">Loading stats...</div>';
+			var wyn='<table id="word_stats" style="border-collapse:collapse;"><tr><th>Word</th><th>Occurences</th></tr>';
+				
+			var ccount=0;
+			
+			for(i in msg.arr)
+			{
+				ccount++;
+				if(ccount>50) break;
+			
+				wyn+="<tr>"
+				
+				wyn+='<td style="word-wrap:break-word; max-width: 300px;">'+msg.arr[i].word+"</td>"
+				
+				wyn+="<td>";
+				
+				wyn+=msg.arr[i].count;
+				
+				wyn+="</td>"
+				
+				wyn+="</tr>"
+			}
+			
+			wyn+="</table>"
+			document.getElementById('word_stats').innerHTML=wyn;
+		}
+		else if(msg.type=="conversation")
+		{
+			var c_div=document.getElementById("conversation");
+			
+			var tmp="", you=msg.you;
+			
+			for(var i in msg.messages)
+			{
+				var tmp2='<div class="message">'
+				if(msg.messages[i].author==you)
+					tmp2+='<div class="your_message"><div class="body">';
+				else
+					tmp2+='<div class="not_your_message"><div class="body">';
+				tmp2+=msg.messages[i].body;
+				
+				tmp2+='</div><div class="message_info">'
+				
+				tmp2+=msg.messages[i].time;
+				
+				tmp2+='</div></div></div>'
+				
+				tmp+=tmp2;
+			}
+			
+			c_div.innerHTML=tmp;
 		}
 		else if(msg.type=="get_name")
 		{
@@ -211,6 +268,47 @@ window.onload = function() {
 	window.myLine = new Chart(ctx, time_line_chart_config);
 
 };
+
+/*==================================================================================*
+ *                                   Word stats & Summary                           *
+ *==================================================================================*/
+
+function get_words_stats()
+{
+	var message={"type": "words_stats",
+				"thread_id": decodeURI(window.location.href).substr(decodeURI(window.location.href).search("\\?")+1)
+				}
+	send(JSON.stringify(message));
+}
+
+function get_summary()
+{
+	document.getElementById("bodydiv").innerHTML='<div id="conversation_settings"></div><br><div id="conversation">Loading summary...</div>';
+	
+	document.getElementById("conversation_settings").innerHTML='<input type="date" id="beg_date">-<input type="date" id="end_date"><button type="button" onclick="get_conversation()">Get</button>'
+	
+	get_conversation();
+}
+
+function get_conversation()
+{
+	var msg={"type": "conversation",
+						"thread_id": decodeURI(window.location.href).substr(decodeURI(window.location.href).search("\\?")+1),
+					}
+					
+	if(document.getElementById("beg_date").value!="" && document.getElementById("end_date").value!="")
+	{
+		msg.beg_date=new Date(document.getElementById("beg_date").value)
+		msg.end_date=new Date(document.getElementById("end_date").value)
+	}
+	else
+	{
+		msg.first_msg=1;
+		msg.msg_count=100;
+	}
+											
+	send(JSON.stringify(msg))
+}
 
 /*==================================================================================*
  *                                   Completion box                                 *

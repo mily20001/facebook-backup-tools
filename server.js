@@ -38,6 +38,7 @@ var threads;
 var people="";
 var messages_conversation=[]
 var word_array=[];
+var mail="";
 
 	
 console.log("Loading parsed JSON...")
@@ -53,9 +54,12 @@ people=JSON.parse(fs.readFileSync("people_list.json"));
 // 		people+='<option value="'+tmp.join(", ")+'">\n'
 // }
 	
-// words_stats();
+// all_words_stats();
 
 // messages_per_conversation();
+
+mail=find_mail();
+replace_mail_to_name(mail);
 
 SERVER_LOADING=false;
 
@@ -87,6 +91,59 @@ function find_thread(participants)
 	}
 	console.error("THREAD NOT FOUND ("+participants+")")
 	return -1;
+}
+
+function find_mail()
+{
+	console.log("Looking for your mail..")
+	mails={};
+	for(var thread_id in threads)
+	{
+		var participants=threads[thread_id].participants;
+		for(var i in threads[thread_id].messages)
+		{
+			var tmp=threads[thread_id].messages[i].author;
+			if(tmp.toString().indexOf("facebook.com")>0 && participants.indexOf(tmp)==-1)
+			{
+				if(mails.hasOwnProperty(tmp))
+					mails[tmp]++;
+				else
+					mails[tmp]=1;
+// 				console.log("found email:"+tmp)
+// 				console.log("participants:"+participants+"\n")
+// 				break;
+			}
+		}
+	}
+	var max=0, count=0
+	var mail=""
+	for(var i in mails)
+	{
+		if(mails[i]>max)
+		{
+			max=mails[i];
+			mail=i;
+		}
+		count+=mails[i];
+	}
+	console.log("problably your mail: "+mail+" ("+parseInt(mails[mail]*100/count)+"%) (should be >50%)")
+	return mail;
+}
+
+function replace_mail_to_name(mail)
+{
+	for(var thread_id in threads)
+	{
+		var participants=threads[thread_id].participants;
+		for(var i in threads[thread_id].messages)
+		{
+			var tmp=threads[thread_id].messages[i].author;
+			if(tmp==mail)
+			{
+				threads[thread_id].messages[i].author=you;
+			}
+		}
+	}
 }
 
 function move_date_back(date, days) //moving date back for <days> days
@@ -345,8 +402,73 @@ function hour_stats()
 	return {"data": data, "labels": labels}
 }
 
+function words_stats(thread_id, ws_id)
+{
+	var arr=[];
+	var words={};
+	var words_count=0;
+	
+	console.log("Generating words stats for conversation "+thread_id)
+	var pbar = new ProgressBar('[:bar] :percent', { total: threads[thread_id].messages.length*2, width: 25, clear:true });
+	
+	var last_percent=0;
+	send_progress(0, ws_id)
+	
+	for(var msg in threads[thread_id].messages)
+	{
+		pbar.tick()
+		if(parseInt(msg*50/threads[thread_id].messages.length)!=last_percent)
+		{
+			send_progress(msg*50/threads[thread_id].messages.length, ws_id)
+			last_percent=parseInt(msg*50/threads[thread_id].messages.length);
+		}
+		var tw=threads[thread_id].messages[msg].body.split(" ");
+		for(var w in tw)
+		{
+			if(tw[w].length<1) continue;
+			
+			tmpw=tw[w].toLowerCase();
+			
+// 				if(tmpw.search(/m+e+h+/im)==-1) continue;
+			
+			if(words.hasOwnProperty(tmpw))
+				words[tmpw]++;
+			else
+			{
+				words_count++;
+				words[tmpw]=1;
+			}
+		}
+	}
+	
+	pbar = new ProgressBar('[:bar] :percent', { total: words_count*2, width: 25, clear:true });
+	pbar.tick(words_count)
+	
+	var i=0;
+	
+	for(var k in words)
+	{
+		pbar.tick()
+		if(parseInt(i*50/words_count)!=last_percent)
+		{
+			send_progress(i*50/words_count+50, ws_id)
+			last_percent=parseInt(i*50/words_count);
+		}
+		i++;
+		arr.push({"word":k, "count": words[k]});
+	}
+	console.log("Found "+words_count+" unique words")
+	console.log("sorting them...")
+	arr.sort(function(a, b){return b.count-a.count})
+	
+	console.log("done.")
+	
+	send_progress(0, ws_id);
+	
+	return arr;
+}
 
-function words_stats()
+function all_words_stats()
 {
 	var words={};
 	var words_count=0;
@@ -460,6 +582,21 @@ function get_conversation(thread_id, first_msg, msg_count)
 	{
 		wyn.push(threads[thread_id].messages[threads[thread_id].messages.length-(first_msg+i+1)]);
 	}
+	return {"messages": wyn}
+}
+
+function get_conversation_between_dates(thread_id, beg, end)
+{
+	var wyn=[];
+	
+	for(var i in threads[thread_id].messages)
+	{
+		var msg=threads[thread_id].messages[i]
+		if(msg.time>=beg && msg.time<=end)
+			wyn.push(msg);
+	}
+	wyn.reverse();
+	console.log("sending "+wyn.length+" messages")
 	return {"messages": wyn}
 }
 
@@ -592,14 +729,26 @@ function ws_request_function(r)
 		}
 		else if(data.type=="conversation")
 		{
-			var thread_id=find_thread(data.participants)
+			var thread_id;
+			
+			if(data.hasOwnProperty("participants"))
+				thread_id=find_thread(data.participants);
+			else
+				thread_id=data.thread_id;
+			
 			if(thread_id==-1)
 			{
 				console.log("thread "+data.participants+" not found")
 				ws_clients[id].sendUTF(JSON.stringify({"error": "requested thread not found"}))
 				return;
 			}
-			var wyn=get_conversation(thread_id, data.first_msg, data.msg_count);
+			
+			var wyn;
+			
+			if(data.hasOwnProperty("beg_date"))
+				wyn=get_conversation_between_dates(thread_id, data.beg_date, data.end_date)
+			else
+				wyn=get_conversation(thread_id, data.first_msg, data.msg_count);
 			
 			if(wyn.hasOwnProperty("error"))
 			{
@@ -614,6 +763,24 @@ function ws_request_function(r)
 					}
 			
 			ws_clients[id].sendUTF(JSON.stringify(wyn));
+		}
+		else if(data.type=="words_stats")
+		{
+			var thread_id;
+			
+			if(data.hasOwnProperty("participants"))
+				thread_id=find_thread(data.participants);
+			else
+				thread_id=data.thread_id;
+			
+			if(thread_id==-1)
+			{
+				console.log("thread "+data.participants+" not found")
+				ws_clients[id].sendUTF(JSON.stringify({"error": "requested thread not found"}))
+				return;
+			}
+			
+			ws_clients[id].sendUTF(JSON.stringify({"type": "words_stats", "arr":words_stats(thread_id, id)}));
 		}
 		else if(data.type=="global_stats")
 		{

@@ -50,7 +50,7 @@
 			<div class="button" data-chooser_color="blue">Individual</div>
 		</div>-->
 		<br>
-		<div class="single_button" id="chart_button" onclick="generate_chart()" onmouseover='document.getElementById("chart_button_bg").style.left=0' onmouseout='document.getElementById("chart_button_bg").style.left="-310px"' style="left: 4%"><div class="single_button_bg" id="chart_button_bg"></div><span>Charts</span></div>
+		<div class="single_button" id="chart_button" onclick="generate_chart()" onmouseover='document.getElementById("chart_button_bg").style.left=0' onmouseout='document.getElementById("chart_button_bg").style.left="-410px"' style="left: 4%"><div class="single_button_bg" id="chart_button_bg"></div><span>Chart</span></div>
 		
 		<div class="button_container" id="type_choose" style="left: 4%"> <div class="chooser"></div>
 			<div class="button" onclick="type_choose_nr='messages'" data-chooser_color="green">Msgs</div>
@@ -58,9 +58,9 @@
 			<div class="button" onclick="type_choose_nr='chars'" data-chooser_color="yellow">Chars</div>
 		</div>
 		<br>
-		<div class="single_button" id="stats_button" onmouseover='document.getElementById("stats_button_bg").style.left=0' onmouseout='document.getElementById("stats_button_bg").style.left="-310px"' style="left: 4%"><div class="single_button_bg" id="stats_button_bg"></div><span id="stats_span">Word stats</span></div>
+		<div class="single_button" id="stats_button" onclick="get_words_stats()" onmouseover='document.getElementById("stats_button_bg").style.left=0' onmouseout='document.getElementById("stats_button_bg").style.left="-410px"' style="left: 4%"><div class="single_button_bg" id="stats_button_bg"></div><span id="stats_span">Word stats</span></div>
 		<br>
-		<div class="single_button" id="summary_button" onmouseover='document.getElementById("summary_button_bg").style.left=0' onmouseout='document.getElementById("summary_button_bg").style.left="-310px"' style="left: 4%"><div class="single_button_bg" id="summary_button_bg"></div><span>Summary</span></div>
+		<div class="single_button" id="summary_button" onclick="get_summary()" onmouseover='document.getElementById("summary_button_bg").style.left=0' onmouseout='document.getElementById("summary_button_bg").style.left="-410px"' style="left: 4%"><div class="single_button_bg" id="summary_button_bg"></div><span>Summary</span></div>
   </div>
   <div id="bodydiv">
 		<div style="width:98%;">
