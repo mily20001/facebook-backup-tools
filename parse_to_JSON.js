@@ -105,34 +105,44 @@ for(var i in threads)
 		
 		var p=cm.indexOf('<span class="user">')+19;
 		var k=cm.indexOf('</span>', p);
+		var datestring="";
 		tmpm.author=cm.substring(p, k)
 		
 		p=cm.indexOf('<span class="meta">', k)+19;
 		k=cm.indexOf('</span>', p);
 		
-		tmpm.time=cm.substring(p, k);
-		tmpm.time=tmpm.time.replace("o ", "");
-		tmpm.time=tmpm.time.replace("styczeń", "january");
-		tmpm.time=tmpm.time.replace("luty", "february");
-		tmpm.time=tmpm.time.replace("marzec", "march");
-		tmpm.time=tmpm.time.replace("kwiecień", "april");
-		tmpm.time=tmpm.time.replace("kwietnia", "april");
-		tmpm.time=tmpm.time.replace("maj", "may");
-		tmpm.time=tmpm.time.replace("czerwiec", "june");
-		tmpm.time=tmpm.time.replace("czerwca", "june");
-		tmpm.time=tmpm.time.replace("lipiec", "july");
-		tmpm.time=tmpm.time.replace("sierpień", "august");
-		tmpm.time=tmpm.time.replace("wrzesień", "september");
-		tmpm.time=tmpm.time.replace("październik", "october");
-		tmpm.time=tmpm.time.replace("listopad", "november");
-		tmpm.time=tmpm.time.replace("grudzień", "december");
-		tmpm.time=new Date(tmpm.time+"00"); /*FIXME*/
+		datestring=cm.substring(p, k);
+		datestring=datestring.replace(" o ", " ");
+		datestring=datestring.replace("styczeń", "january");
+		datestring=datestring.replace("stycznia", "january");
+		datestring=datestring.replace("lutego", "february");
+		datestring=datestring.replace("luty", "february");
+		datestring=datestring.replace("marzec", "march");
+		datestring=datestring.replace("marca", "march");
+		datestring=datestring.replace("kwiecień", "april");
+		datestring=datestring.replace("kwietnia", "april");
+		datestring=datestring.replace("maj", "may");
+		datestring=datestring.replace("maja", "may");
+		datestring=datestring.replace("czerwiec", "june");
+		datestring=datestring.replace("czerwca", "june");
+		datestring=datestring.replace("lipiec", "july");
+		datestring=datestring.replace("lipca", "july");
+		datestring=datestring.replace("sierpień", "august");
+		datestring=datestring.replace("sierpnia", "august");
+		datestring=datestring.replace("wrzesień", "september");
+		datestring=datestring.replace("września", "september");
+		datestring=datestring.replace("październik", "october");
+		datestring=datestring.replace("listopad", "november");
+		datestring=datestring.replace("grudzień", "december");
+		datestring=datestring.replace("grudnia", "december");
+		tmpm.time=new Date(datestring+"00"); /*FIXME*/
 		
 		if(tmpm.time=="Invalid Date")
 		{
 			if(tmpm.time=="Invalid Date")
 				console.error("ERROR.")
 			console.log("ss:'"+cm.substring(p, k)+"'")
+			console.log("datestring:'"+datestring+"'")
 			console.log("msg: "+cm)
 			console.log("omsg:"+messages[j])
 			console.log("j="+j)
