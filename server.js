@@ -99,21 +99,12 @@ function find_mail()
 	mails={};
 	for(var thread_id in threads)
 	{
-		var participants=threads[thread_id].participants;
-		for(var i in threads[thread_id].messages)
-		{
-			var tmp=threads[thread_id].messages[i].author;
-			if(tmp.toString().indexOf("facebook.com")>0 && participants.indexOf(tmp)==-1)
-			{
-				if(mails.hasOwnProperty(tmp))
-					mails[tmp]++;
-				else
-					mails[tmp]=1;
-// 				console.log("found email:"+tmp)
-// 				console.log("participants:"+participants+"\n")
-// 				break;
-			}
-		}
+		threads[thread_id].participants.forEach((participant) => {
+            if(mails.hasOwnProperty(participant))
+                mails[participant]++;
+            else
+                mails[participant]=1;
+        });
 	}
 	var max=0, count=0
 	var mail=""

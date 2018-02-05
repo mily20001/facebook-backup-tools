@@ -8,6 +8,8 @@ console.log("opening file..")
 // var file=fs.readFileSync("test.html").toString()
 var file=fs.readFileSync("messages.htm").toString()
 
+var idToNames = JSON.parse(fs.readFileSync("id_to_name.json").toString());
+
 
 var threads=file.split('<div class="thread">')
 
@@ -66,6 +68,12 @@ function add_thread(participants)
 	return main.push(tmpobj)-1;
 }
 
+function getNameFromId(id) {
+    if(idToNames[id] === undefined)
+        return id;
+    return idToNames[id];
+}
+
 var count=0;
 
 var pbar = new ProgressBar('parsing [:bar] :percent :elapseds', { total: threads.length, current: 0, width: 30, incomplete: " " });
@@ -81,7 +89,7 @@ for(var i in threads)
     continue;
   }
   
-  var participants=cthread.substring(0, cthread.indexOf('<div class="message">')).split(", ")
+  var participants=cthread.substring(0, cthread.indexOf('<div class="message">')).replace(/&#064;/g, "@").split(", ").map((person) => getNameFromId(person.split("@")[0]));
 	
 	var thread_id=add_thread(participants);
   
