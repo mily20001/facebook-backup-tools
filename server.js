@@ -292,6 +292,8 @@ function conversation_stats(thread_id, interval, chart_type, ws_id)
 	time.setUTCMinutes(0);
 	time.setUTCSeconds(0);
 	time.setUTCMilliseconds(0);
+    
+    console.log('First message: ', time);
 	
 	var now=new Date();
 	
@@ -331,7 +333,7 @@ function conversation_stats(thread_id, interval, chart_type, ws_id)
 		else
 			increment=0; //should not happen
 		
-		if(threads[thread_id].messages[i].author==you) //checking it message was sent or received
+		if(threads[thread_id].messages[i].author===you) //checking it message was sent or received
 		{
 			statsS[m_label]+=increment
 		}

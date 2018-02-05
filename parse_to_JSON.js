@@ -5,13 +5,17 @@ var generate_stats=1;
 
 console.log("opening file..")
 
+const filesToParse = fs.readdirSync('facebook_data/messages/').filter((file) => /(.*\.html)$/.test(file));
+
+console.log(filesToParse);
+
 // var file=fs.readFileSync("test.html").toString()
-var file=fs.readFileSync("messages.htm").toString()
+// var file=fs.readFileSync("messages.htm").toString()
 
 var idToNames = JSON.parse(fs.readFileSync("id_to_name.json").toString());
 
 
-var threads=file.split('<div class="thread">')
+var threads=filesToParse.map((filename) => fs.readFileSync(`facebook_data/messages/${filename}`).toString().split('<div class="thread">')[1]);
 
 var main=[];
 /*
@@ -30,6 +34,12 @@ var main=[];
 
 String.prototype.removeAt=function(index) { //removes single char at position
     return this.substr(0, index)+this.substr(index+1);
+}
+
+function getNameFromId(id) {
+    if(idToNames[id] === undefined)
+        return id;
+    return idToNames[id];
 }
 
 function add_thread(participants)
@@ -68,111 +78,112 @@ function add_thread(participants)
 	return main.push(tmpobj)-1;
 }
 
-function getNameFromId(id) {
-    if(idToNames[id] === undefined)
-        return id;
-    return idToNames[id];
-}
-
 var count=0;
 
 var pbar = new ProgressBar('parsing [:bar] :percent :elapseds', { total: threads.length, current: 0, width: 30, incomplete: " " });
 
-for(var i in threads)
-{
-	pbar.tick();
-	
-	var cthread=threads[i].toString();
-	
-  if(cthread.indexOf("<html>")>-1) //skipping header and stuff
-  {
-    continue;
-  }
+threads.forEach((thread) => {
+    pbar.tick();
+
+    const title = thread.substring(4, thread.indexOf('</h3>'));
+    const tmpThread = thread.substring(thread.indexOf('</h3>')+5)
+    const participants = tmpThread.substring(0, tmpThread.indexOf('<')).substring('Participants: '.length).split(', ');
+    
+    if(participants.length === 0) {
+        console.log(title);
+    }
+
+    const parsedThread = {
+        participants,
+        first_message: 140671468526300,
+        messages: [],
+    };
   
-  var participants=cthread.substring(0, cthread.indexOf('<div class="message">')).replace(/&#064;/g, "@").split(", ").map((person) => getNameFromId(person.split("@")[0]));
-	
-	var thread_id=add_thread(participants);
-  
-  var messages=cthread.split('<div class="message">')
-	
-  for(var j in messages)
-  {
-		if(j==0) continue; /*FIXME*/
-		var cm=messages[j].toString();
-    var tmpm={};
-    tmpm.author="";
-    tmpm.time=0;
-    tmpm.body="";
-		
-		var body_begin=cm.indexOf('<p>')+3;
-		
-		while(cm.indexOf('\n')!=-1 && cm.indexOf('\n')<body_begin) //need to remove newlines from html code
-		{
-			cm=cm.removeAt(cm.indexOf('\n'), "");
-		}
-		
-		var p=cm.indexOf('<span class="user">')+19;
-		var k=cm.indexOf('</span>', p);
-		var datestring="";
-		tmpm.author=cm.substring(p, k)
-		
-		p=cm.indexOf('<span class="meta">', k)+19;
-		k=cm.indexOf('</span>', p);
-		
-		datestring=cm.substring(p, k);
-		datestring=datestring.replace(" o ", " ");
-		datestring=datestring.replace("styczeń", "january");
-		datestring=datestring.replace("stycznia", "january");
-		datestring=datestring.replace("lutego", "february");
-		datestring=datestring.replace("luty", "february");
-		datestring=datestring.replace("marzec", "march");
-		datestring=datestring.replace("marca", "march");
-		datestring=datestring.replace("kwiecień", "april");
-		datestring=datestring.replace("kwietnia", "april");
-		datestring=datestring.replace("maj", "may");
-		datestring=datestring.replace("maja", "may");
-		datestring=datestring.replace("czerwiec", "june");
-		datestring=datestring.replace("czerwca", "june");
-		datestring=datestring.replace("lipiec", "july");
-		datestring=datestring.replace("lipca", "july");
-		datestring=datestring.replace("sierpień", "august");
-		datestring=datestring.replace("sierpnia", "august");
-		datestring=datestring.replace("wrzesień", "september");
-		datestring=datestring.replace("września", "september");
-		datestring=datestring.replace("październik", "october");
-		datestring=datestring.replace("listopad", "november");
-		datestring=datestring.replace("grudzień", "december");
-		datestring=datestring.replace("grudnia", "december");
-		tmpm.time=new Date(datestring+"00"); /*FIXME*/
-		
-		if(tmpm.time=="Invalid Date")
-		{
-			if(tmpm.time=="Invalid Date")
-				console.error("ERROR.")
-			console.log("ss:'"+cm.substring(p, k)+"'")
-			console.log("datestring:'"+datestring+"'")
-			console.log("msg: "+cm)
-			console.log("omsg:"+messages[j])
-			console.log("j="+j)
-// 			fs.writeFile("bug.lol", messages[j])
-			break;
-		}
-		
-		if(main[thread_id].first_message>tmpm.time)
-		{
-			main[thread_id].first_message=tmpm.time;
-		}
-		
-		p=body_begin;
-		k=cm.indexOf('</p>', p);
-		
-		tmpm.body=cm.substring(p, k)
-		
-//     console.log(tmpm.author+" @ "+tmpm.time+": "+tmpm.body)
-		
-		main[thread_id].messages.push(tmpm);
-  }
-}
+    const messages=thread.split('<div class="message">').slice(1);
+    
+    messages.forEach((cm) => {
+        var tmpm={};
+        tmpm.author="";
+        tmpm.time=0;
+        tmpm.body="";
+        
+        var body_begin=cm.indexOf('<p>')+3;
+        
+        while(cm.indexOf('\n')!=-1 && cm.indexOf('\n')<body_begin) //need to remove newlines from html code
+        {
+            cm=cm.removeAt(cm.indexOf('\n'), "");
+        }
+        
+        var p=cm.indexOf('<span class="user">')+19;
+        var k=cm.indexOf('</span>', p);
+        var datestring="";
+        tmpm.author=cm.substring(p, k)
+        
+        p=cm.indexOf('<span class="meta">', k)+19;
+        k=cm.indexOf('</span>', p);
+        
+        datestring=cm.substring(p, k);
+        datestring=datestring.replace(" o ", " ");
+        datestring=datestring.replace("styczeń", "january");
+        datestring=datestring.replace("stycznia", "january");
+        datestring=datestring.replace("lutego", "february");
+        datestring=datestring.replace("luty", "february");
+        datestring=datestring.replace("marzec", "march");
+        datestring=datestring.replace("marca", "march");
+        datestring=datestring.replace("kwiecień", "april");
+        datestring=datestring.replace("kwietnia", "april");
+        datestring=datestring.replace("maj", "may");
+        datestring=datestring.replace("maja", "may");
+        datestring=datestring.replace("czerwiec", "june");
+        datestring=datestring.replace("czerwca", "june");
+        datestring=datestring.replace("lipiec", "july");
+        datestring=datestring.replace("lipca", "july");
+        datestring=datestring.replace("sierpień", "august");
+        datestring=datestring.replace("sierpnia", "august");
+        datestring=datestring.replace("wrzesień", "september");
+        datestring=datestring.replace("września", "september");
+        datestring=datestring.replace("październik", "october");
+        datestring=datestring.replace("listopad", "november");
+        datestring=datestring.replace("grudzień", "december");
+        datestring=datestring.replace("grudnia", "december");
+        tmpm.time=new Date(datestring+"00"); /*FIXME*/
+        
+        if(tmpm.time=="Invalid Date")
+        {
+            if(tmpm.time=="Invalid Date")
+                console.error("ERROR.")
+            console.log("ss:'"+cm.substring(p, k)+"'")
+            console.log("datestring:'"+datestring+"'")
+            console.log("msg: "+cm)
+            console.log("omsg:"+messages[j])
+            console.log("j="+j)
+    // 			fs.writeFile("bug.lol", messages[j])
+//             break;
+        }
+        
+        
+        
+        p=body_begin;
+        k=cm.indexOf('</p>', p);
+        
+        tmpm.body=cm.substring(p, k)
+        
+        if(tmpm.body.length > 0)
+        {
+        
+            if(parsedThread.first_message>tmpm.time)
+            {
+                parsedThread.first_message=tmpm.time;
+            }
+            
+        //     console.log(tmpm.author+" @ "+tmpm.time+": "+tmpm.body)
+            
+            parsedThread.messages.push(tmpm);
+        }
+    });
+    
+    main.push(parsedThread);
+});
 
 function max(a, b)
 {
